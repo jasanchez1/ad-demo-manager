@@ -128,7 +128,7 @@ document.addEventListener('click', function (event) {
     selectedElement.classList.add('inspector-selected');
 
     // Update display
-
+    setSelectedElementInfo(infoDisplay, selectedElement);
     debugLog(`Element selected: ${targetElement.tagName}`);
   }
 }, true);

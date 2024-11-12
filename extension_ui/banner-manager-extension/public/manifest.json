@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Ad Demo Manager",
+  "version": "1.0",
+  "description": "Manage banner configurations",
+  "permissions": ["storage"],
+  "action": {
+    "default_popup": "popup.html",
+     "default_icon": {
+      "16": "icon.jpg",
+      "32": "icon.jpg",
+      "48": "icon.jpg",
+      "128": "icon.jpg"
+    }
+  },
+  "icons": {
+    "16": "icon.jpg",
+    "32": "icon.jpg",
+    "48": "icon.jpg",
+    "128": "icon.jpg"
+  }
+}

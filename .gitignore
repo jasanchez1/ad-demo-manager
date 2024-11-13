@@ -60,3 +60,5 @@ coverage
 build/
 dist/
 .output/
+
+.DS_Store

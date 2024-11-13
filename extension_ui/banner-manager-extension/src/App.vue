@@ -3,27 +3,25 @@
     <div class="header">
       <img src="/icon.jpg" alt="Banner Manager Icon" class="header-icon" />
       <h1 class="title">Ad Demo Manager</h1>
+      <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey">
+        <div class="saved-item">Network ID: {{ savedValues.networkId }}</div>
+        <div class="saved-item">API Key: ******</div>
+      </div>
     </div>
     <div class="content">
-      <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey">
-        <h2 class="subtitle">Saved Values:</h2>
-        <div class="saved-item">Network ID: {{ savedValues.networkId }}</div>
-        <div class="saved-item">API Key: {{ savedValues.apiKey }}</div>
-      </div>
-
+      <h3 class="title">Network Settings</h3>
       <div class="form">
         <div class="input-group">
           <label>Network ID</label>
-          <input type="text" v-model="networkId" placeholder="Enter Network ID">
+          <input type="text" v-model="networkId" placeholder='Enter Network'>
         </div>
         <div class="input-group">
           <label>API Key</label>
-          <input type="text" v-model="apiKey" placeholder="Enter API Key">
+          <input type="text" v-model="apiKey" placeholder='Enter API Key'>
         </div>
-        <button @click="saveSettings">Save Settings</button>
+        <button @click="saveSettings">Save</button>
       </div>
 
-      <!-- Feedback Message -->
       <div v-if="message" :class="['message', messageType]">
         {{ message }}
       </div>
@@ -47,20 +45,54 @@ export default {
       loadSavedValues()
     })
 
+    // Validation function
+    const validateSettingsInput = (): { valid: boolean; message: string } => {
+      // Check if both fields are filled
+      if (!networkId.value || !apiKey.value) {
+        return {
+          valid: false,
+          message: 'Both Network ID and API Key are required'
+        }
+      }
+
+      // Check if networkId is numeric
+      if (!/^\d+$/.test(networkId.value)) {
+        return {
+          valid: false,
+          message: 'Network ID must be numeric'
+        }
+      }
+
+      return { valid: true, message: '' }
+    }
+
     // Function to load saved values
     const loadSavedValues = () => {
       chrome.storage.sync.get(['networkId', 'apiKey'], (result) => {
         console.log('Loaded values:', result)
+        const loadedNetworkId = result.networkId || ''
+        const loadedApiKey = result.apiKey || ''
+        networkId.value = loadedNetworkId;
+        apiKey.value = loadedApiKey;
         savedValues.value = {
-          networkId: result.networkId || '',
-          apiKey: result.apiKey || ''
+          networkId: loadedNetworkId,
+          apiKey: loadedApiKey
         }
       })
     }
 
     const saveSettings = () => {
+      // Validate before saving
+      const validation = validateSettingsInput()
+      if (!validation.valid) {
+        message.value = validation.message
+        messageType.value = 'error'
+        setTimeout(() => {
+          message.value = ''
+        }, 3000)
+        return
+      }
       console.log('Saving values:', { networkId: networkId.value, apiKey: apiKey.value })
-
       chrome.storage.sync.set({
         networkId: networkId.value,
         apiKey: apiKey.value
@@ -90,7 +122,7 @@ export default {
       message,
       messageType,
       savedValues,
-      saveSettings
+      saveSettings,
     }
   }
 }
@@ -101,7 +133,7 @@ export default {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px;
+  padding: 12px;
   background: #001830;
 }
 
@@ -127,7 +159,6 @@ body {
   padding: 0;
   width: 400px;
   height: 300px;
-  overflow: hidden;
 }
 
 #app {
@@ -137,7 +168,7 @@ body {
 
 .app-container {
   width: 100%;
-  height: 100%;
+  min-height: 100%;
   background: #003060;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow: auto;
@@ -148,23 +179,27 @@ body {
   background: #001830;
   border-radius: 4px;
   margin: 8px;
+  flex-direction: column;
+  display: flex;
+  height: 100%;
 }
 
 .form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .input-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .input-group label {
-  font-size: 14px;
-  color: white;
+  font-size: 12px;
+  color: #aaa;
 }
 
 input {
@@ -172,8 +207,9 @@ input {
   padding: 8px;
   border: 1px solid #e2e8f0;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 12px;
 }
+
 
 input:focus {
   outline: none;
@@ -198,27 +234,26 @@ button:hover {
 }
 
 .saved-values {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 12px;
+  background: #003060;
+  padding: 6px 6px 8px 8px;
   border-radius: 4px;
-  margin-bottom: 16px;
+  color: white;
+  margin-left: auto;
 }
 
-.subtitle {
-  font-size: 14px;
-  color: #fd563c;
-  margin: 0 0 8px 0;
+.saved-values:hover {
+  background: #3182ce;
 }
+
 
 .saved-item {
-  color: white;
   font-size: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .message {
   margin-top: 12px;
-  padding: 8px;
+  padding: 4px;
   border-radius: 4px;
   font-size: 14px;
   text-align: center;

@@ -10,7 +10,9 @@
     </div>
     <div class="content">
       <div class="settings" v-if="setSettings">
+
         <h3 class="title">Network Settings</h3>
+        <h5 class="menu-description">Before continuing, you need to set configure your network settings</h5>
         <div class="form">
           <div class="input-group">
             <label>Network ID</label>
@@ -23,6 +25,22 @@
           <button @click="saveSettings">Save</button>
         </div>
       </div>
+      <div class="ad-configs" v-if="!setSettings">
+        <h3 class="title">Ad Configurations</h3>
+        <div class="ad-list">
+          <div v-for="config in adConfigs" :key="config.id" class="ad-item">
+            <div class="ad-info">
+              <div class="ad-type">{{ config.type }}</div>
+              <div class="ad-url">{{ config.url }}</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" :checked="config.active" @change="toggleAdConfig(config.id)">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+        <button class="create-button" @click="createNewAd">Create New Ad Config</button>
+      </div>
       <div v-if="message" :class="['message', messageType]">
         {{ message }}
       </div>
@@ -32,6 +50,13 @@
 
 <script lang="ts">
 import { ref, onMounted } from 'vue'
+// Add these to your existing setup
+interface AdConfig {
+  id: number;
+  type: string;
+  url: string;
+  active: boolean;
+}
 
 export default {
   setup() {
@@ -41,6 +66,20 @@ export default {
     const messageType = ref('')
     const savedValues = ref({ networkId: '', apiKey: '' })
     const setSettings = ref(false)
+    const adConfigs = ref<AdConfig[]>([
+      {
+        id: 1,
+        type: 'Banner',
+        url: 'https://example.com/*',
+        active: true
+      },
+      {
+        id: 2,
+        type: 'Native Ad',
+        url: 'https://example.com/blog/*',
+        active: false
+      }
+    ])
 
     // Load saved values when component mounts
     onMounted(() => {
@@ -94,6 +133,19 @@ export default {
       })
     }
 
+    const toggleAdConfig = (id: number) => {
+      const config = adConfigs.value.find(c => c.id === id)
+      if (config) {
+        config.active = !config.active
+        // Save to storage or handle state change
+      }
+    }
+
+    const createNewAd = () => {
+      // Handle new ad creation
+      console.log('Create new ad clicked')
+    }
+
     const saveSettings = () => {
       // Validate before saving
       const validation = validateSettingsInput()
@@ -139,6 +191,9 @@ export default {
       saveSettings,
       setSettings,
       enableSetSettings,
+      adConfigs,
+      toggleAdConfig,
+      createNewAd
     }
   }
 }
@@ -162,11 +217,17 @@ export default {
 }
 
 .title {
-  margin: 0;
-  line-height: 32px;
   font-size: 15px;
   font-weight: 500;
+  margin: 0;
   color: white;
+}
+
+.menu-description {
+  font-size: 14px;
+  font-weight: 300;
+  color: #aaa;
+  margin: 8px 0px 8px 0px;
 }
 
 html,
@@ -198,6 +259,8 @@ body {
   flex-direction: column;
   display: flex;
   height: 100%;
+  min-height: 320px;
+  justify-content: space-between;
 }
 
 .form {
@@ -217,7 +280,7 @@ body {
 
 .input-group label {
   font-size: 12px;
-  color: #aaa;
+  color: white;
 }
 
 input {
@@ -248,7 +311,7 @@ button {
 }
 
 button:hover {
-  background: #3182ce;
+  background: #e64a32;
 }
 
 .saved-values {
@@ -271,7 +334,7 @@ button:hover {
 }
 
 .message {
-  margin-top: 12px;
+  margin-top: auto;
   padding: 4px;
   border-radius: 4px;
   font-size: 14px;
@@ -279,12 +342,109 @@ button:hover {
 }
 
 .success {
-  background-color: rgba(72, 187, 120, 0.2);
-  color: #48bb78;
+  background-color: #3182ce;
+  color: white;
 }
 
 .error {
   background-color: rgba(245, 101, 101, 0.2);
   color: #f56565;
+}
+
+.ad-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.ad-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.ad-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.ad-info {
+  flex: 1;
+}
+
+.ad-type {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.ad-url {
+  color: #aaa;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.create-button {
+  margin-top: auto;
+  background: #fd563c;
+}
+
+.create-button:hover {
+  background: #e64a32;
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #4B5563;
+  transition: .4s;
+  border-radius: 20px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked+.slider {
+  background-color: #3182ce;
+}
+
+input:checked+.slider:before {
+  transform: translateX(20px);
+}
+
+.ad-info {
+  flex: 1;
+  margin-right: 12px;
 }
 </style>

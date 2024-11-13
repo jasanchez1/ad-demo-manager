@@ -3,25 +3,26 @@
     <div class="header">
       <img src="/icon.jpg" alt="Banner Manager Icon" class="header-icon" />
       <h1 class="title">Ad Demo Manager</h1>
-      <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey">
+      <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey" @click="enableSetSettings">
         <div class="saved-item">Network ID: {{ savedValues.networkId }}</div>
         <div class="saved-item">API Key: ******</div>
       </div>
     </div>
     <div class="content">
-      <h3 class="title">Network Settings</h3>
-      <div class="form">
-        <div class="input-group">
-          <label>Network ID</label>
-          <input type="text" v-model="networkId" placeholder='Enter Network'>
+      <div class="settings" v-if="setSettings">
+        <h3 class="title">Network Settings</h3>
+        <div class="form">
+          <div class="input-group">
+            <label>Network ID</label>
+            <input type="text" v-model="networkId" placeholder='Enter Network'>
+          </div>
+          <div class="input-group">
+            <label>API Key</label>
+            <input type="text" v-model="apiKey" placeholder='Enter API Key'>
+          </div>
+          <button @click="saveSettings">Save</button>
         </div>
-        <div class="input-group">
-          <label>API Key</label>
-          <input type="text" v-model="apiKey" placeholder='Enter API Key'>
-        </div>
-        <button @click="saveSettings">Save</button>
       </div>
-
       <div v-if="message" :class="['message', messageType]">
         {{ message }}
       </div>
@@ -39,11 +40,20 @@ export default {
     const message = ref('')
     const messageType = ref('')
     const savedValues = ref({ networkId: '', apiKey: '' })
+    const setSettings = ref(false)
 
     // Load saved values when component mounts
     onMounted(() => {
       loadSavedValues()
     })
+
+    const enableSetSettings = () => {
+      setSettings.value = true;
+    }
+
+    const disableSetSettings = () => {
+      setSettings.value = false;
+    }
 
     // Validation function
     const validateSettingsInput = (): { valid: boolean; message: string } => {
@@ -78,6 +88,9 @@ export default {
           networkId: loadedNetworkId,
           apiKey: loadedApiKey
         }
+        if (!loadedApiKey || !loadedNetworkId) {
+          enableSetSettings();
+        }
       })
     }
 
@@ -107,6 +120,7 @@ export default {
           message.value = 'Settings saved successfully!'
           messageType.value = 'success'
           loadSavedValues() // Reload the saved values
+          disableSetSettings();
         }
 
         // Clear message after 3 seconds
@@ -123,6 +137,8 @@ export default {
       messageType,
       savedValues,
       saveSettings,
+      setSettings,
+      enableSetSettings,
     }
   }
 }
@@ -191,10 +207,12 @@ body {
 }
 
 .input-group {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 4px;
+  box-sizing: border-box;
 }
 
 .input-group label {
@@ -203,7 +221,6 @@ body {
 }
 
 input {
-  width: 80%;
   padding: 8px;
   border: 1px solid #e2e8f0;
   border-radius: 4px;
@@ -219,7 +236,7 @@ input:focus {
 
 button {
   padding: 8px 16px;
-  width: 80%;
+  width: 100%;
   background: #fd563c;
   color: white;
   border: none;
@@ -227,6 +244,7 @@ button {
   font-size: 14px;
   cursor: pointer;
   transition: background 0.2s;
+  box-sizing: border-box;
 }
 
 button:hover {
@@ -243,6 +261,7 @@ button:hover {
 
 .saved-values:hover {
   background: #3182ce;
+  cursor: pointer;
 }
 
 

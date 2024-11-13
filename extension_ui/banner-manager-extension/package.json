@@ -5,7 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "vite",
-    "build": "vite build",
+    "generate-icons": "node scripts/generate-icons.js",
+    "build": "vite build && npm run generate-icons && cp public/manifest.json dist/",
     "preview": "vite preview",
     "clean": "rm -rf dist node_modules package-lock.json"
   },
@@ -16,6 +17,7 @@
   "devDependencies": {
     "@types/chrome": "^0.0.280",
     "@vitejs/plugin-vue": "^5.1.4",
+    "sharp": "^0.33.5",
     "typescript": "^5.6.3",
     "vite": "^5.4.10"
   }

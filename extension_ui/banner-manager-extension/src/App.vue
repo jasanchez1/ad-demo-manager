@@ -5,7 +5,7 @@
       <h1 class="title">Ad Demo Manager</h1>
       <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey" @click="enableSetSettings">
         <div class="saved-item">Network ID: {{ savedValues.networkId }}</div>
-        <div class="saved-item">API Key: ******</div>
+        <div class="saved-item">API Key: **********</div>
       </div>
     </div>
     <div class="content">
@@ -22,24 +22,68 @@
             <label>API Key</label>
             <input type="text" v-model="apiKey" placeholder='Enter API Key'>
           </div>
-          <button @click="saveSettings">Save</button>
+          <div class="actions">
+            <button v-if="savedValues.networkId && savedValues.apiKey" class="secondary"
+              @click="disableSetSettings">Cancel</button>
+            <button @click="saveSettings">Save</button>
+          </div>
         </div>
       </div>
       <div class="ad-configs" v-if="!setSettings">
         <h3 class="title">Ad Configurations</h3>
         <div class="ad-list">
-          <div v-for="config in adConfigs" :key="config.id" class="ad-item">
+          <div v-for="config in adConfigs" :key="config.id" class="ad-item" @click="openAdDetails(config)">
             <div class="ad-info">
-              <div class="ad-type">{{ config.type }}</div>
-              <div class="ad-url">{{ config.url }}</div>
+              <div class="ad-header">
+                <span class="ad-name">{{ config.name }}</span>
+                <span class="ad-type-badge">{{ config.adType.name }}</span>
+              </div>
+              <div class="ad-details">
+                <div class="ad-site">{{ config.site.name }}</div>
+                <div class="ad-url">{{ config.url }}</div>
+              </div>
             </div>
-            <label class="toggle">
-              <input type="checkbox" :checked="config.active" @change="toggleAdConfig(config.id)">
+            <label class="toggle" @click.stop>
+              <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
               <span class="slider"></span>
             </label>
           </div>
         </div>
         <button class="create-button" @click="createNewAd">Create New Ad Config</button>
+      </div>
+
+      <div v-if="selectedAd" class="ad-details-modal">
+        <h3 class="title">Edit Ad Configuration</h3>
+        <div class="form">
+          <div class="input-group">
+            <label>Name</label>
+            <input type="text" v-model="selectedAd.name">
+          </div>
+          <div class="input-group">
+            <label>Ad Type</label>
+            <select v-model="selectedAd.adType.id">
+              <option v-for="type in adTypes" :key="type.id" :value="type.id">
+                {{ type.name }}
+              </option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Site</label>
+            <select v-model="selectedAd.site.id">
+              <option v-for="site in sites" :key="site.id" :value="site.id">
+                {{ site.name }}
+              </option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>URL Pattern</label>
+            <input type="text" v-model="selectedAd.url">
+          </div>
+          <div class="actions">
+            <button class="secondary" @click="closeAdDetails">Cancel</button>
+            <button @click="saveAdDetails">Save</button>
+          </div>
+        </div>
       </div>
       <div v-if="message" :class="['message', messageType]">
         {{ message }}
@@ -50,12 +94,24 @@
 
 <script lang="ts">
 import { ref, onMounted } from 'vue'
-// Add these to your existing setup
+
+interface AdType {
+  id: number;
+  name: string;
+}
+
+interface Site {
+  id: number;
+  name: string;
+}
+
 interface AdConfig {
   id: number;
-  type: string;
+  name: string;
+  adType: AdType;
+  site: Site;
   url: string;
-  active: boolean;
+  isActive: boolean;
 }
 
 export default {
@@ -66,22 +122,50 @@ export default {
     const messageType = ref('')
     const savedValues = ref({ networkId: '', apiKey: '' })
     const setSettings = ref(false)
+
+    const adTypes = ref<AdType[]>([
+      { id: 1, name: 'Banner' },
+      { id: 2, name: 'Interstitial' },
+      { id: 3, name: 'Video' }
+    ])
+
+    const sites = ref<Site[]>([
+      { id: 1, name: 'Example Site' },
+      { id: 2, name: 'Blog Site' }
+    ])
+
     const adConfigs = ref<AdConfig[]>([
       {
         id: 1,
-        type: 'Banner',
+        name: 'Homepage Banner',
+        adType: { id: 1, name: 'Banner' },
+        site: { id: 1, name: 'Example Site' },
         url: 'https://example.com/*',
-        active: true
-      },
-      {
-        id: 2,
-        type: 'Native Ad',
-        url: 'https://example.com/blog/*',
-        active: false
+        isActive: true
       }
     ])
 
-    // Load saved values when component mounts
+    const selectedAd = ref<AdConfig | null>(null)
+
+    const openAdDetails = (config: AdConfig) => {
+      selectedAd.value = { ...config }
+    }
+
+    const closeAdDetails = () => {
+      selectedAd.value = null
+    }
+
+    const saveAdDetails = () => {
+      if (!selectedAd.value) return
+
+      const index = adConfigs.value.findIndex(ad => ad.id === selectedAd.value?.id)
+      if (index !== -1) {
+        adConfigs.value[index] = { ...selectedAd.value }
+      }
+
+      closeAdDetails()
+    }
+
     onMounted(() => {
       loadSavedValues()
     })
@@ -193,7 +277,14 @@ export default {
       enableSetSettings,
       adConfigs,
       toggleAdConfig,
-      createNewAd
+      createNewAd,
+      adTypes,
+      sites,
+      selectedAd,
+      openAdDetails,
+      closeAdDetails,
+      saveAdDetails,
+      disableSetSettings
     }
   }
 }
@@ -365,6 +456,7 @@ button:hover {
   padding: 12px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
+  cursor: pointer;
 }
 
 .ad-toggle input[type="checkbox"] {
@@ -446,5 +538,69 @@ input:checked+.slider:before {
 .ad-info {
   flex: 1;
   margin-right: 12px;
+}
+
+.ad-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ad-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: white;
+}
+
+.ad-type-badge {
+  background: rgba(253, 86, 60, 0.1);
+  color: #fd563c;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.ad-details {
+  margin-top: 4px;
+}
+
+.ad-site {
+  color: #aaa;
+  font-size: 12px;
+}
+
+.ad-url {
+  color: #aaa;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.ad-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ad-details-modal {
+  background: #001830;
+  padding: 16px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.secondary {
+  background: transparent;
+  border: 1px solid #fd563c;
+}
+
+select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 12px;
+  background: white;
 }
 </style>

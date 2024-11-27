@@ -3,14 +3,13 @@
     <div class="header">
       <img src="/icon.jpg" alt="Banner Manager Icon" class="header-icon" />
       <h1 class="title">Ad Demo Manager</h1>
-      <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey" @click="enableSetSettings">
+      <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey" @click="navigateTo(Page.Settings)">
         <div class="saved-item">Network ID: {{ savedValues.networkId }}</div>
         <div class="saved-item">API Key: **********</div>
       </div>
     </div>
     <div class="content">
-      <div class="settings" v-if="setSettings">
-
+      <div class="settings" v-if="currentPage === Page.Settings">
         <h3 class="title">Network Settings</h3>
         <h5 class="menu-description">Before continuing, you need to set configure your network settings</h5>
         <div class="form">
@@ -24,12 +23,12 @@
           </div>
           <div class="actions">
             <button v-if="savedValues.networkId && savedValues.apiKey" class="secondary"
-              @click="disableSetSettings">Cancel</button>
+              @click="navigateBack">Cancel</button>
             <button @click="saveSettings">Save</button>
           </div>
         </div>
       </div>
-      <div class="ad-configs" v-if="!setSettings">
+      <div class="ad-configs" v-if="currentPage === Page.AdConfigs">
         <h3 class="title">Ad Configurations</h3>
         <div class="ad-list">
           <div v-for="config in adConfigs" :key="config.id" class="ad-item" @click="openAdDetails(config)">
@@ -114,6 +113,13 @@ interface AdConfig {
   isActive: boolean;
 }
 
+enum Page {
+  Settings = "settings",
+  AdConfigs = "adConfigs",
+  EditConfig = "editConfig",
+  CreateConfig = "createConfig"
+}
+
 export default {
   setup() {
     const networkId = ref('')
@@ -121,7 +127,8 @@ export default {
     const message = ref('')
     const messageType = ref('')
     const savedValues = ref({ networkId: '', apiKey: '' })
-    const setSettings = ref(false)
+    const currentPage = ref<Page>(Page.AdConfigs)
+    const lastPage = ref<Page>(Page.AdConfigs)
 
     const adTypes = ref<AdType[]>([
       { id: 1, name: 'Banner' },
@@ -147,12 +154,24 @@ export default {
 
     const selectedAd = ref<AdConfig | null>(null)
 
+    const navigateTo = (page: Page) => {
+      lastPage.value = currentPage.value;
+      currentPage.value = page;
+    }
+
+    const navigateBack = () => {
+      currentPage.value = lastPage.value;
+      lastPage.value = currentPage.value;
+    }
+
     const openAdDetails = (config: AdConfig) => {
       selectedAd.value = { ...config }
+      navigateTo(Page.EditConfig);
     }
 
     const closeAdDetails = () => {
       selectedAd.value = null
+      navigateBack();
     }
 
     const saveAdDetails = () => {
@@ -169,14 +188,6 @@ export default {
     onMounted(() => {
       loadSavedValues()
     })
-
-    const enableSetSettings = () => {
-      setSettings.value = true;
-    }
-
-    const disableSetSettings = () => {
-      setSettings.value = false;
-    }
 
     // Validation function
     const validateSettingsInput = (): { valid: boolean; message: string } => {
@@ -212,7 +223,7 @@ export default {
           apiKey: loadedApiKey
         }
         if (!loadedApiKey || !loadedNetworkId) {
-          enableSetSettings();
+          navigateTo(Page.Settings)
         }
       })
     }
@@ -255,8 +266,8 @@ export default {
           console.log('Settings saved successfully')
           message.value = 'Settings saved successfully!'
           messageType.value = 'success'
-          loadSavedValues() // Reload the saved values
-          disableSetSettings();
+          loadSavedValues(); // Reload the saved values
+          navigateBack();
         }
 
         // Clear message after 3 seconds
@@ -273,8 +284,8 @@ export default {
       messageType,
       savedValues,
       saveSettings,
-      setSettings,
-      enableSetSettings,
+      navigateTo,
+      navigateBack,
       adConfigs,
       toggleAdConfig,
       createNewAd,
@@ -284,7 +295,8 @@ export default {
       openAdDetails,
       closeAdDetails,
       saveAdDetails,
-      disableSetSettings
+      currentPage,
+      Page,
     }
   }
 }

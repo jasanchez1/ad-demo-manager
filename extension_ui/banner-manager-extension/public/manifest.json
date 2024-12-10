@@ -4,7 +4,14 @@
   "version": "1.0",
   "description": "Manage banner configurations",
   "permissions": [
-    "storage"
+    "storage",
+    "webRequest"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "https://api.kevel.co/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -16,9 +23,9 @@
     }
   },
   "icons": {
-      "16": "icon16.png",
-      "32": "icon32.png",
-      "48": "icon48.png",
-      "128": "icon128.png"
-    }
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
 }

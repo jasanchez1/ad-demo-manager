@@ -62,3 +62,6 @@ dist/
 .output/
 
 .DS_Store
+
+# Lockfile
+package-lock.json

@@ -24,7 +24,7 @@
           <div class="actions">
             <button v-if="savedValues.networkId && savedValues.apiKey" class="secondary"
               @click="navigateBack">Cancel</button>
-            <button @click="saveSettings">Save</button>
+            <button @click="saveSettings" :disabled="isLoading"> {{ isLoading ? 'Saving...' : 'Save' }} </button>
           </div>
         </div>
       </div>
@@ -35,7 +35,9 @@
             <div class="ad-info">
               <div class="ad-header">
                 <span class="ad-name">{{ config.name }}</span>
-                <span class="ad-type-badge">{{ config.adType.name }}</span>
+                <span class="ad-type-badge">{{ `${config.adType.name} -
+                  ${config.adType.width}x${config.adType.height}`
+                  }}</span>
               </div>
               <div class="ad-details">
                 <div class="ad-site">{{ config.site.name }}</div>
@@ -51,7 +53,7 @@
         <button class="create-button" @click="createNewAd">Create New Ad Config</button>
       </div>
 
-      <div v-if="selectedAd" class="ad-details-modal">
+      <div v-if="currentPage === Page.EditConfig" class="ad-details-modal">
         <h3 class="title">Edit Ad Configuration</h3>
         <div class="form">
           <div class="input-group">
@@ -97,6 +99,8 @@ import { ref, onMounted } from 'vue'
 interface AdType {
   id: number;
   name: string;
+  height: number;
+  width: number;
 }
 
 interface Site {
@@ -120,6 +124,72 @@ enum Page {
   CreateConfig = "createConfig"
 }
 
+class KevelApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = 'KevelApiError';
+  }
+}
+
+class UnauthorizedError extends KevelApiError {
+  constructor(message: string = 'Invalid API key') {
+    super(401, message);
+    this.name = 'UnauthorizedError';
+  }
+}
+
+async function getSites(apiKey: string): Promise<Site[]> {
+  const response = await new Promise(resolve => {
+    chrome.runtime.sendMessage({
+      type: 'site',
+      apiKey: apiKey
+    }, resolve);
+  });
+
+  if (!response.success) {
+    if (response.status === 403) {
+      throw new UnauthorizedError();
+    }
+    throw new KevelApiError(response.status, response.error);
+  }
+
+  return response.data.items.map((x: { Id: number; Title: string }) => ({
+    id: x.Id,
+    name: x.Title
+  }));
+}
+
+
+async function getAdTypes(apiKey: string): Promise<AdType[]> {
+  const response = await new Promise(resolve => {
+    chrome.runtime.sendMessage({
+      type: 'adtypes',
+      apiKey: apiKey
+    }, resolve);
+  });
+
+  if (!response.success) {
+    if (response.status === 401) {
+      throw new UnauthorizedError();
+    }
+    throw new KevelApiError(response.status, response.error);
+  }
+
+  // TODO: It's currently limited by pagination.
+  return response.data.items.map((x: { Id: string, Name: string, Height: number, Width: number }) => {
+    return {
+      id: x.Id,
+      name: x.Name,
+      height: x.Height,
+      width: x.Width
+    }
+  })
+
+}
+
+
 export default {
   setup() {
     const networkId = ref('')
@@ -129,24 +199,16 @@ export default {
     const savedValues = ref({ networkId: '', apiKey: '' })
     const currentPage = ref<Page>(Page.AdConfigs)
     const lastPage = ref<Page>(Page.AdConfigs)
-
-    const adTypes = ref<AdType[]>([
-      { id: 1, name: 'Banner' },
-      { id: 2, name: 'Interstitial' },
-      { id: 3, name: 'Video' }
-    ])
-
-    const sites = ref<Site[]>([
-      { id: 1, name: 'Example Site' },
-      { id: 2, name: 'Blog Site' }
-    ])
+    const adTypes = ref<AdType[]>([])
+    const sites = ref<Site[]>([])
+    const isLoading = ref(false)
 
     const adConfigs = ref<AdConfig[]>([
       {
         id: 1,
         name: 'Homepage Banner',
-        adType: { id: 1, name: 'Banner' },
-        site: { id: 1, name: 'Example Site' },
+        adType: { id: 3, name: 'Full Banner', width: 125, height: 30 },
+        site: { id: 1295844, name: 'Web' },
         url: 'https://example.com/*',
         isActive: true
       }
@@ -171,7 +233,7 @@ export default {
 
     const closeAdDetails = () => {
       selectedAd.value = null
-      navigateBack();
+      navigateTo(Page.AdConfigs);
     }
 
     const saveAdDetails = () => {
@@ -189,8 +251,27 @@ export default {
       loadSavedValues()
     })
 
+    const fetchNetworkDetails = async (apiKey: string) => {
+      try {
+        sites.value = await getSites(apiKey);
+        adTypes.value = await getAdTypes(apiKey)
+      } catch (error) {
+        if (error instanceof UnauthorizedError) {
+          // Handle unauthorized case specifically
+          return {
+            valid: false,
+            message: 'The API Key is not authorized.'
+          }
+        }
+        return {
+          valid: false,
+          message: 'Error communicating with the Kevel API'
+        }
+      }
+    }
+
     // Validation function
-    const validateSettingsInput = (): { valid: boolean; message: string } => {
+    const validateSettingsInput = async (): Promise<{ valid: boolean; message: string }> => {
       // Check if both fields are filled
       if (!networkId.value || !apiKey.value) {
         return {
@@ -206,7 +287,10 @@ export default {
           message: 'Network ID must be numeric'
         }
       }
-
+      const fetchError = await fetchNetworkDetails(apiKey.value)
+      if (fetchError !== undefined) {
+        return fetchError
+      }
       return { valid: true, message: '' }
     }
 
@@ -225,13 +309,16 @@ export default {
         if (!loadedApiKey || !loadedNetworkId) {
           navigateTo(Page.Settings)
         }
+        else {
+          fetchNetworkDetails(apiKey.value);
+        }
       })
     }
 
     const toggleAdConfig = (id: number) => {
       const config = adConfigs.value.find(c => c.id === id)
       if (config) {
-        config.active = !config.active
+        config.isActive = !config.isActive
         // Save to storage or handle state change
       }
     }
@@ -241,15 +328,18 @@ export default {
       console.log('Create new ad clicked')
     }
 
-    const saveSettings = () => {
+    const saveSettings = async () => {
       // Validate before saving
-      const validation = validateSettingsInput()
+      isLoading.value = true
+      const validation = await validateSettingsInput()
+
       if (!validation.valid) {
         message.value = validation.message
         messageType.value = 'error'
         setTimeout(() => {
           message.value = ''
         }, 3000)
+        isLoading.value = false
         return
       }
       console.log('Saving values:', { networkId: networkId.value, apiKey: apiKey.value })
@@ -269,7 +359,7 @@ export default {
           loadSavedValues(); // Reload the saved values
           navigateBack();
         }
-
+        isLoading.value = false
         // Clear message after 3 seconds
         setTimeout(() => {
           message.value = ''
@@ -297,6 +387,7 @@ export default {
       saveAdDetails,
       currentPage,
       Page,
+      isLoading,
     }
   }
 }
@@ -614,5 +705,10 @@ select {
   border-radius: 4px;
   font-size: 12px;
   background: white;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

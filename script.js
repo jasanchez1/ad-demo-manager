@@ -15,8 +15,6 @@ if (location.href.includes(TARGET_URL)) {
     var impressionURLs = [];
     var categoryId = null;
 
-
-
     async function fetchBannerAds() {
         console.log("Fetching ads...")
         await fetch(DECISIONS_API_URL, {
@@ -114,9 +112,9 @@ if (location.href.includes(TARGET_URL)) {
             parentDiv.style.paddingBottom = "80px";  // Adjust as needed
             parentDiv.style.clear = "both"; // Ensure clear if using floats
 
-            if (!document.getElementById("injected-banner")) {  // Prevent re-injecting
+            if (!document.getElementById(DIV_NAME)) {  // Prevent re-injecting
                 var bannerDiv = document.createElement("div");
-                bannerDiv.id = "injected-banner";
+                bannerDiv.id = DIV_NAME;
                 bannerDiv.style.width = "624px";
                 bannerDiv.style.height = "80px";
                 bannerDiv.style.margin = "0 auto";
@@ -213,6 +211,5 @@ if (location.href.includes(TARGET_URL)) {
 
     // Start observing the target node
     observer.observe(targetNode, config);
-
 }
 

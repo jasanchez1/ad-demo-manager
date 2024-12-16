@@ -28,7 +28,7 @@
           </div>
         </div>
       </div>
-      <div class="ad-configs" v-if="currentPage === Page.AdConfigs">
+      <div v-if="currentPage === Page.AdConfigs">
         <h3 class="title">Ad Configurations</h3>
         <div class="ad-list">
           <div v-for="config in adConfigs" :key="config.id" class="ad-item" @click="openAdDetails(config)">
@@ -53,9 +53,9 @@
         <button class="create-button" @click="createNewAd">Create New Ad Config</button>
       </div>
 
-      <div v-if="currentPage === Page.EditConfig" class="ad-details-modal">
+      <div v-if="currentPage === Page.EditConfig && selectedAd">
         <h3 class="title">Edit Ad Configuration</h3>
-        <div class="form">
+        <div class="ad-details-modal">
           <div class="input-group">
             <label>Name</label>
             <input type="text" v-model="selectedAd.name">
@@ -80,6 +80,14 @@
             <label>URL Pattern</label>
             <input type="text" v-model="selectedAd.url">
           </div>
+          <div class="input-group">
+            <label>Container ID</label>
+            <input type="text" v-model="selectedAd.divId">
+          </div>
+          <div class="input-group">
+            <label>Keyword URL Parameter</label>
+            <input type="text" v-model="selectedAd.keywordQueryParam">
+          </div>
           <div class="actions">
             <button class="secondary" @click="closeAdDetails">Cancel</button>
             <button @click="saveAdDetails">Save</button>
@@ -94,7 +102,8 @@
 </template>
 
 <script lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted } from '@vue/runtime-core'
+import type { Ref } from '@vue/runtime-core'
 
 interface AdType {
   id: number;
@@ -115,6 +124,8 @@ interface AdConfig {
   site: Site;
   url: string;
   isActive: boolean;
+  divId: string;
+  keywordQueryParam?: string;
 }
 
 enum Page {
@@ -140,8 +151,31 @@ class UnauthorizedError extends KevelApiError {
   }
 }
 
+interface KevelAPIResponse<T = any> {
+  success: boolean;
+  status?: number;
+  error?: string;
+  data?: T;
+}
+
+interface SiteResponse {
+  items: Array<{
+    Id: number;
+    Title: string;
+  }>;
+}
+
+interface AdTypeResponse {
+  items: Array<{
+    Id: number;
+    Name: string;
+    Width: number;
+    Height: number;
+  }>;
+}
+
 async function getSites(apiKey: string): Promise<Site[]> {
-  const response = await new Promise(resolve => {
+  const response = await new Promise<KevelAPIResponse<SiteResponse>>(resolve => {
     chrome.runtime.sendMessage({
       type: 'site',
       apiKey: apiKey
@@ -152,10 +186,15 @@ async function getSites(apiKey: string): Promise<Site[]> {
     if (response.status === 403) {
       throw new UnauthorizedError();
     }
-    throw new KevelApiError(response.status, response.error);
+    throw new KevelApiError(response.status || 500, response.error || 'Unknown error');
   }
 
-  return response.data.items.map((x: { Id: number; Title: string }) => ({
+  // Type guard to ensure data and items exist
+  if (!response.data?.items) {
+    throw new KevelApiError(500, 'Invalid response format');
+  }
+
+  return response.data.items.map((x) => ({
     id: x.Id,
     name: x.Title
   }));
@@ -163,7 +202,7 @@ async function getSites(apiKey: string): Promise<Site[]> {
 
 
 async function getAdTypes(apiKey: string): Promise<AdType[]> {
-  const response = await new Promise(resolve => {
+  const response = await new Promise<KevelAPIResponse<AdTypeResponse>>(resolve => {
     chrome.runtime.sendMessage({
       type: 'adtypes',
       apiKey: apiKey
@@ -171,14 +210,19 @@ async function getAdTypes(apiKey: string): Promise<AdType[]> {
   });
 
   if (!response.success) {
-    if (response.status === 401) {
+    if (response.status === 403) {
       throw new UnauthorizedError();
     }
-    throw new KevelApiError(response.status, response.error);
+    throw new KevelApiError(response.status || 500, response.error || 'Unknown error');
+  }
+
+  // Type guard to ensure data and items exist
+  if (!response.data?.items) {
+    throw new KevelApiError(500, 'Invalid response format');
   }
 
   // TODO: It's currently limited by pagination.
-  return response.data.items.map((x: { Id: string, Name: string, Height: number, Width: number }) => {
+  return response.data.items.map(x => {
     return {
       id: x.Id,
       name: x.Name,
@@ -189,9 +233,34 @@ async function getAdTypes(apiKey: string): Promise<AdType[]> {
 
 }
 
+interface Setup {
+  networkId: Ref<string>;
+  apiKey: Ref<string>;
+  message: Ref<string>;
+  messageType: Ref<string>;
+  savedValues: Ref<{
+    networkId: string;
+    apiKey: string;
+  }>;
+  saveSettings: () => Promise<void>;
+  navigateTo: (page: Page) => void;
+  navigateBack: () => void;
+  adConfigs: Ref<AdConfig[]>;
+  toggleAdConfig: (id: number) => void;
+  createNewAd: () => void;
+  adTypes: Ref<AdType[]>;
+  sites: Ref<Site[]>;
+  selectedAd: Ref<AdConfig | null>;
+  openAdDetails: (config: AdConfig) => void;
+  closeAdDetails: () => void;
+  saveAdDetails: () => void;
+  currentPage: Ref<Page>;
+  Page: typeof Page;
+  isLoading: Ref<boolean>;
+}
 
 export default {
-  setup() {
+  setup(): Setup {
     const networkId = ref('')
     const apiKey = ref('')
     const message = ref('')
@@ -203,14 +272,16 @@ export default {
     const sites = ref<Site[]>([])
     const isLoading = ref(false)
 
-    const adConfigs = ref<AdConfig[]>([
+    const adConfigs: Ref<AdConfig[]> = ref<AdConfig[]>([
       {
         id: 1,
         name: 'Homepage Banner',
         adType: { id: 3, name: 'Full Banner', width: 125, height: 30 },
         site: { id: 1295844, name: 'Web' },
         url: 'https://example.com/*',
-        isActive: true
+        isActive: true,
+        divId: "someId",
+        //keywordQueryParam: "scq"
       }
     ])
 
@@ -239,7 +310,7 @@ export default {
     const saveAdDetails = () => {
       if (!selectedAd.value) return
 
-      const index = adConfigs.value.findIndex(ad => ad.id === selectedAd.value?.id)
+      const index = adConfigs.value.findIndex((ad: AdConfig) => ad.id === selectedAd.value?.id)
       if (index !== -1) {
         adConfigs.value[index] = { ...selectedAd.value }
       }
@@ -316,7 +387,7 @@ export default {
     }
 
     const toggleAdConfig = (id: number) => {
-      const config = adConfigs.value.find(c => c.id === id)
+      const config = adConfigs.value.find((c: AdConfig) => c.id === id)
       if (config) {
         config.isActive = !config.isActive
         // Save to storage or handle state change
@@ -683,8 +754,10 @@ input:checked+.slider:before {
 }
 
 .ad-details-modal {
-  background: #001830;
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
 }
 
 .actions {

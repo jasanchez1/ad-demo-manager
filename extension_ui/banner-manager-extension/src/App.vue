@@ -94,6 +94,49 @@
           </div>
         </div>
       </div>
+
+      <div v-if="currentPage === Page.CreateConfig">
+        <h3 class="title">Create New Ad Configuration</h3>
+        <div class="ad-details-modal">
+          <div class="input-group">
+            <label>Name</label>
+            <input type="text" v-model="newAd.name">
+          </div>
+          <div class="input-group">
+            <label>Ad Type</label>
+            <select v-model="newAd.adType.id">
+              <option v-for="type in adTypes" :key="type.id" :value="type.id">
+                {{ type.name }}
+              </option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Site</label>
+            <select v-model="newAd.site.id">
+              <option v-for="site in sites" :key="site.id" :value="site.id">
+                {{ site.name }}
+              </option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>URL Pattern</label>
+            <input type="text" v-model="newAd.url">
+          </div>
+          <div class="input-group">
+            <label>Container ID</label>
+            <input type="text" v-model="newAd.divId">
+          </div>
+          <div class="input-group">
+            <label>Keyword URL Parameter</label>
+            <input type="text" v-model="newAd.keywordQueryParam">
+          </div>
+          <div class="actions">
+            <button class="secondary" @click="cancelCreateAd">Cancel</button>
+            <button @click="saveNewAd">Save</button>
+          </div>
+        </div>
+      </div>
+
       <div v-if="message" :class="['message', messageType]">
         {{ message }}
       </div>
@@ -216,7 +259,6 @@ async function getAdTypes(apiKey: string): Promise<AdType[]> {
     throw new KevelApiError(response.status || 500, response.error || 'Unknown error');
   }
 
-  // Type guard to ensure data and items exist
   if (!response.data?.items) {
     throw new KevelApiError(500, 'Invalid response format');
   }
@@ -234,6 +276,17 @@ async function getAdTypes(apiKey: string): Promise<AdType[]> {
 }
 
 interface Setup {
+  saveSettings: () => Promise<void>;
+  navigateTo: (page: Page) => void;
+  navigateBack: () => void;
+  toggleAdConfig: (id: number) => void;
+  createNewAd: () => void;
+  cancelCreateAd: () => void;
+  saveNewAd: () => void;
+  saveAdDetails: () => void;
+  openAdDetails: (config: AdConfig) => void;
+  closeAdDetails: () => void;
+  deleteAdConfig: (id: number) => void;
   networkId: Ref<string>;
   apiKey: Ref<string>;
   message: Ref<string>;
@@ -242,22 +295,26 @@ interface Setup {
     networkId: string;
     apiKey: string;
   }>;
-  saveSettings: () => Promise<void>;
-  navigateTo: (page: Page) => void;
-  navigateBack: () => void;
   adConfigs: Ref<AdConfig[]>;
-  toggleAdConfig: (id: number) => void;
-  createNewAd: () => void;
   adTypes: Ref<AdType[]>;
   sites: Ref<Site[]>;
   selectedAd: Ref<AdConfig | null>;
-  openAdDetails: (config: AdConfig) => void;
-  closeAdDetails: () => void;
-  saveAdDetails: () => void;
   currentPage: Ref<Page>;
   Page: typeof Page;
   isLoading: Ref<boolean>;
+  newAd: Ref<AdConfig>;
 }
+
+const getEmptyNewAd = (): AdConfig => ({
+  id: 0,
+  name: '',
+  adType: { id: 0, name: '', width: 0, height: 0 },
+  site: { id: 0, name: '' },
+  url: '',
+  isActive: true,
+  divId: '',
+  keywordQueryParam: ''
+})
 
 export default {
   setup(): Setup {
@@ -271,20 +328,8 @@ export default {
     const adTypes = ref<AdType[]>([])
     const sites = ref<Site[]>([])
     const isLoading = ref(false)
-
-    const adConfigs: Ref<AdConfig[]> = ref<AdConfig[]>([
-      {
-        id: 1,
-        name: 'Homepage Banner',
-        adType: { id: 3, name: 'Full Banner', width: 125, height: 30 },
-        site: { id: 1295844, name: 'Web' },
-        url: 'https://example.com/*',
-        isActive: true,
-        divId: "someId",
-        //keywordQueryParam: "scq"
-      }
-    ])
-
+    const adConfigs = ref<AdConfig[]>([])
+    const newAd = ref<AdConfig>(getEmptyNewAd())
     const selectedAd = ref<AdConfig | null>(null)
 
     const navigateTo = (page: Page) => {
@@ -305,17 +350,6 @@ export default {
     const closeAdDetails = () => {
       selectedAd.value = null
       navigateTo(Page.AdConfigs);
-    }
-
-    const saveAdDetails = () => {
-      if (!selectedAd.value) return
-
-      const index = adConfigs.value.findIndex((ad: AdConfig) => ad.id === selectedAd.value?.id)
-      if (index !== -1) {
-        adConfigs.value[index] = { ...selectedAd.value }
-      }
-
-      closeAdDetails()
     }
 
     onMounted(() => {
@@ -365,38 +399,107 @@ export default {
       return { valid: true, message: '' }
     }
 
-    // Function to load saved values
     const loadSavedValues = () => {
-      chrome.storage.sync.get(['networkId', 'apiKey'], (result) => {
+      chrome.storage.sync.get(['networkId', 'apiKey', 'adConfigs'], (result) => {
         console.log('Loaded values:', result)
         const loadedNetworkId = result.networkId || ''
         const loadedApiKey = result.apiKey || ''
-        networkId.value = loadedNetworkId;
-        apiKey.value = loadedApiKey;
+        const loadedAdConfigs = result.adConfigs || []
+
+        networkId.value = loadedNetworkId
+        apiKey.value = loadedApiKey
+        adConfigs.value = loadedAdConfigs
+
         savedValues.value = {
           networkId: loadedNetworkId,
           apiKey: loadedApiKey
         }
+
         if (!loadedApiKey || !loadedNetworkId) {
           navigateTo(Page.Settings)
-        }
-        else {
-          fetchNetworkDetails(apiKey.value);
+        } else {
+          fetchNetworkDetails(apiKey.value)
         }
       })
+    }
+
+    const createNewAd = () => {
+      newAd.value = getEmptyNewAd();
+      navigateTo(Page.CreateConfig)
+    }
+
+    const cancelCreateAd = () => {
+      navigateTo(Page.AdConfigs)
+    }
+
+    const saveAdConfigsToStorage = () => {
+      chrome.storage.sync.set({
+        adConfigs: adConfigs.value
+      }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('Save error:', chrome.runtime.lastError)
+          message.value = 'Error saving ad configurations'
+          messageType.value = 'error'
+        } else {
+          message.value = 'Ad configurations saved successfully!'
+          messageType.value = 'success'
+        }
+        // Clear message after 3 seconds
+        setTimeout(() => {
+          message.value = ''
+        }, 3000)
+      })
+    }
+
+    const saveNewAd = () => {
+      const newId = Math.max(0, ...adConfigs.value.map((ad: AdConfig) => ad.id)) + 1
+      const selectedAdType = adTypes.value.find((type: AdType) => type.id === newAd.value.adType.id)
+      const selectedSite = sites.value.find((site: Site) => site.id === newAd.value.site.id)
+
+      if (!selectedAdType || !selectedSite) {
+        message.value = 'Please select both ad type and site'
+        messageType.value = 'error'
+        return
+      }
+
+      const finalAdConfig: AdConfig = {
+        ...newAd.value,
+        id: newId,
+        adType: selectedAdType,
+        site: selectedSite
+      }
+
+      adConfigs.value.push(finalAdConfig)
+      saveAdConfigsToStorage()
+      navigateTo(Page.AdConfigs)
+    }
+
+    const saveAdDetails = () => {
+      if (!selectedAd.value) return
+
+      const index = adConfigs.value.findIndex((ad: AdConfig) => ad.id === selectedAd.value?.id)
+      if (index !== -1) {
+        adConfigs.value[index] = { ...selectedAd.value }
+        saveAdConfigsToStorage()
+      }
+
+      closeAdDetails()
+    }
+
+    const deleteAdConfig = (id: number) => {
+      const index = adConfigs.value.findIndex((ad: AdConfig) => ad.id === id)
+      if (index !== -1) {
+        adConfigs.value.splice(index, 1)
+        saveAdConfigsToStorage()
+      }
     }
 
     const toggleAdConfig = (id: number) => {
       const config = adConfigs.value.find((c: AdConfig) => c.id === id)
       if (config) {
         config.isActive = !config.isActive
-        // Save to storage or handle state change
+        saveAdConfigsToStorage()
       }
-    }
-
-    const createNewAd = () => {
-      // Handle new ad creation
-      console.log('Create new ad clicked')
     }
 
     const saveSettings = async () => {
@@ -446,10 +549,13 @@ export default {
       savedValues,
       saveSettings,
       navigateTo,
+      deleteAdConfig,
       navigateBack,
+      saveNewAd,
       adConfigs,
       toggleAdConfig,
       createNewAd,
+      cancelCreateAd,
       adTypes,
       sites,
       selectedAd,
@@ -459,6 +565,7 @@ export default {
       currentPage,
       Page,
       isLoading,
+      newAd,
     }
   }
 }

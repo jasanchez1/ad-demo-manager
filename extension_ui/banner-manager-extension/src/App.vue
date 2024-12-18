@@ -44,10 +44,15 @@
                 <div class="ad-url">{{ config.url }}</div>
               </div>
             </div>
-            <label class="toggle" @click.stop>
-              <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
-              <span class="slider"></span>
-            </label>
+            <div class="ad-config-actions">
+              <label class="toggle" @click.stop>
+                <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
+                <span class="slider"></span>
+              </label>
+              <label class="delete" @click.stop="deleteAdConfig(config.id)">
+                <span class="delete-icon">×</span>
+              </label>
+            </div>
           </div>
         </div>
         <button class="create-button" @click="createNewAd">Create New Ad Config</button>
@@ -404,7 +409,7 @@ export default {
         console.log('Loaded values:', result)
         const loadedNetworkId = result.networkId || ''
         const loadedApiKey = result.apiKey || ''
-        const loadedAdConfigs = result.adConfigs || []
+        const loadedAdConfigs: AdConfig[] = result.adConfigs ? Object.values(result.adConfigs) : [];
 
         networkId.value = loadedNetworkId
         apiKey.value = loadedApiKey
@@ -890,5 +895,31 @@ select {
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.ad-config-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.delete {
+  cursor: pointer;
+  color: #e74c3c;
+  font-size: 24px;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.delete:hover {
+  opacity: 1;
+}
+
+.delete-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
 }
 </style>

@@ -58,89 +58,11 @@
         <button class="create-button" @click="createNewAd">Create New Ad Config</button>
       </div>
 
-      <div v-if="currentPage === Page.EditConfig && selectedAd">
-        <h3 class="title">Edit Ad Configuration</h3>
-        <div class="ad-details-modal">
-          <div class="input-group">
-            <label>Name</label>
-            <input type="text" v-model="selectedAd.name">
-          </div>
-          <div class="input-group">
-            <label>Ad Type</label>
-            <select v-model="selectedAd.adType.id">
-              <option v-for="type in adTypes" :key="type.id" :value="type.id">
-                {{ type.name }}
-              </option>
-            </select>
-          </div>
-          <div class="input-group">
-            <label>Site</label>
-            <select v-model="selectedAd.site.id">
-              <option v-for="site in sites" :key="site.id" :value="site.id">
-                {{ site.name }}
-              </option>
-            </select>
-          </div>
-          <div class="input-group">
-            <label>URL Pattern</label>
-            <input type="text" v-model="selectedAd.url">
-          </div>
-          <div class="input-group">
-            <label>Container ID</label>
-            <input type="text" v-model="selectedAd.divId">
-          </div>
-          <div class="input-group">
-            <label>Keyword URL Parameter</label>
-            <input type="text" v-model="selectedAd.keywordQueryParam">
-          </div>
-          <div class="actions">
-            <button class="secondary" @click="closeAdDetails">Cancel</button>
-            <button @click="saveAdDetails">Save</button>
-          </div>
-        </div>
-      </div>
+      <AdForm v-if="currentPage === Page.EditConfig && selectedAd" :ad-data="selectedAd" :ad-types="adTypes"
+        :sites="sites" :is-edit="true" @save="saveAdDetails" @cancel="closeAdDetails" />
 
-      <div v-if="currentPage === Page.CreateConfig">
-        <h3 class="title">Create New Ad Configuration</h3>
-        <div class="ad-details-modal">
-          <div class="input-group">
-            <label>Name</label>
-            <input type="text" v-model="newAd.name">
-          </div>
-          <div class="input-group">
-            <label>Ad Type</label>
-            <select v-model="newAd.adType.id">
-              <option v-for="type in adTypes" :key="type.id" :value="type.id">
-                {{ type.name }}
-              </option>
-            </select>
-          </div>
-          <div class="input-group">
-            <label>Site</label>
-            <select v-model="newAd.site.id">
-              <option v-for="site in sites" :key="site.id" :value="site.id">
-                {{ site.name }}
-              </option>
-            </select>
-          </div>
-          <div class="input-group">
-            <label>URL Pattern</label>
-            <input type="text" v-model="newAd.url">
-          </div>
-          <div class="input-group">
-            <label>Container ID</label>
-            <input type="text" v-model="newAd.divId">
-          </div>
-          <div class="input-group">
-            <label>Keyword URL Parameter</label>
-            <input type="text" v-model="newAd.keywordQueryParam">
-          </div>
-          <div class="actions">
-            <button class="secondary" @click="cancelCreateAd">Cancel</button>
-            <button @click="saveNewAd">Save</button>
-          </div>
-        </div>
-      </div>
+      <AdForm v-if="currentPage === Page.CreateConfig" :ad-data="newAd" :ad-types="adTypes" :sites="sites"
+        :is-edit="false" @save="saveNewAd" @cancel="cancelCreateAd" />
 
       <div v-if="message" :class="['message', messageType]">
         {{ message }}
@@ -150,77 +72,34 @@
 </template>
 
 <script lang="ts">
-import { ref, onMounted } from '@vue/runtime-core'
-import type { Ref } from '@vue/runtime-core'
+import { Ref, ref, onMounted } from '@vue/runtime-core'
+import { AdForm } from './components/AdForm'
+import type { Site, AdType, AdConfig,KevelAPIResponse, SiteResponse, AdTypeResponse } from '../src/types'
 
-interface AdType {
-  id: number;
-  name: string;
-  height: number;
-  width: number;
-}
-
-interface Site {
-  id: number;
-  name: string;
-}
-
-interface AdConfig {
-  id: number;
-  name: string;
-  adType: AdType;
-  site: Site;
-  url: string;
-  isActive: boolean;
-  divId: string;
-  keywordQueryParam?: string;
-}
-
-enum Page {
-  Settings = "settings",
-  AdConfigs = "adConfigs",
-  EditConfig = "editConfig",
-  CreateConfig = "createConfig"
-}
 
 class KevelApiError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-    this.name = 'KevelApiError';
-  }
+    status: number;
+    constructor(status: number, message: string) {
+        super(message);
+        this.status = status;
+        this.name = 'KevelApiError';
+    }
 }
 
 class UnauthorizedError extends KevelApiError {
-  constructor(message: string = 'Invalid API key') {
-    super(401, message);
-    this.name = 'UnauthorizedError';
-  }
+    constructor(message: string = 'Invalid API key') {
+        super(401, message);
+        this.name = 'UnauthorizedError';
+    }
 }
 
-interface KevelAPIResponse<T = any> {
-  success: boolean;
-  status?: number;
-  error?: string;
-  data?: T;
+enum Page {
+    Settings = "settings",
+    AdConfigs = "adConfigs",
+    EditConfig = "editConfig",
+    CreateConfig = "createConfig"
 }
 
-interface SiteResponse {
-  items: Array<{
-    Id: number;
-    Title: string;
-  }>;
-}
-
-interface AdTypeResponse {
-  items: Array<{
-    Id: number;
-    Name: string;
-    Width: number;
-    Height: number;
-  }>;
-}
 
 async function getSites(apiKey: string): Promise<Site[]> {
   const response = await new Promise<KevelAPIResponse<SiteResponse>>(resolve => {
@@ -322,6 +201,9 @@ const getEmptyNewAd = (): AdConfig => ({
 })
 
 export default {
+  components: {
+    AdForm 
+  },
   setup(): Setup {
     const networkId = ref('')
     const apiKey = ref('')

@@ -73,7 +73,7 @@ function injectAd(config, networkId) {
     function trackImpressionWhenVisible() {
         const banner = document.getElementById(DIV_NAME);
         if (!banner || !impressionURLs) {
-            console.log("Banner or impression URL not found");
+            showNotification("Error tracking impression", "error");
             return;
         }
 
@@ -81,9 +81,11 @@ function injectAd(config, networkId) {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     fetch(impressionURLs[0]).then(response => {
-                        console.log('Impression tracked:', response.status);
+                        if (response.ok) {
+                            showNotification("Impression tracked!", "success");
+                        }
                     }).catch(error => {
-                        console.error('Error tracking impression:', error);
+                        showNotification("Failed to track impression", "error");
                     });
                     observer.unobserve(banner);
                 }
@@ -147,6 +149,10 @@ function injectAd(config, networkId) {
                 var bannerLink = document.createElement("a");
                 bannerLink.href = clickURLs[0];  // The URL to redirect to
 
+                bannerLink.addEventListener('click', () => {
+                    showNotification('Click tracked!', 'success');
+                });
+
                 bannerDiv.appendChild(bannerImg);
                 parentDiv.appendChild(bannerDiv);
                 bannerLink.appendChild(bannerImg);
@@ -201,4 +207,95 @@ function injectAd(config, networkId) {
 
     // Initial fetch and inject
     fetchTrackAndInjectBanner();
+}
+
+function showNotification(message, type = 'success') {
+    const notification = document.createElement('div');
+    notification.className = 'ad-tracker-notification';
+
+    // Create the content
+    const content = document.createElement('div');
+    content.className = 'notification-content';
+
+    // Add check icon for success, X for error
+    const icon = document.createElement('span');
+    icon.className = 'notification-icon';
+    icon.innerHTML = type === 'success' ? '✓' : '✕';
+
+    const text = document.createElement('span');
+    text.textContent = message;
+
+    content.appendChild(icon);
+    content.appendChild(text);
+    notification.appendChild(content);
+
+    // Add styles
+    const styles = document.createElement('style');
+    styles.textContent = `
+        .ad-tracker-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        background: #001830;
+        color: white;
+        border-radius: 4px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 16px;
+        font-weight: 500;
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        animation: slideIn 0.3s ease-out;
+        border: 1px solid rgba(253, 86, 60, 0.3);
+        min-width: 200px;
+        }
+
+        .notification-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        }
+
+        .notification-icon {
+        color: #fd563c;
+        font-weight: bold;
+        font-size: 20px;
+        }
+
+        @keyframes slideIn {
+        from {
+        transform: translateY(-20px);
+        opacity: 0;
+        }
+        to {
+        transform: translateY(0);
+        opacity: 1;
+        }
+        }
+
+        @keyframes slideOut {
+        from {
+        transform: translateY(0);
+        opacity: 1;
+        }
+        to {
+        transform: translateY(-20px);
+        opacity: 0;
+        }
+        }
+    `;
+
+    document.head.appendChild(styles);
+    document.body.appendChild(notification);
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-in forwards';
+        setTimeout(() => {
+            notification.remove();
+            styles.remove();
+        }, 300);
+    }, 3000);
 }

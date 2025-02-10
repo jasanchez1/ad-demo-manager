@@ -103,60 +103,74 @@ function injectAd(config, networkId) {
             const parentDiv = parentElements[0];
 
             // Add padding to the parent div to create space below the banner
-            parentDiv.style.paddingBottom = "80px";  // Adjust as needed
+            parentDiv.style.paddingBottom = `${config.adType.height * 1.3}px`;  // Adjust as needed
             parentDiv.style.clear = "both"; // Ensure clear if using floats
 
             if (!document.getElementById(DIV_NAME)) {
-                var bannerDiv = document.createElement("div");
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes pulseBorder {
+                        0% {
+                            box-shadow: 0 0 0 0 rgba(253, 86, 60, 0.7);
+                            border-color: rgba(253, 86, 60, 0.9);
+                        }
+                        70% {
+                            box-shadow: 0 0 0 10px rgba(253, 86, 60, 0);
+                            border-color: rgba(253, 86, 60, 0.3);
+                        }
+                        100% {
+                            box-shadow: 0 0 0 0 rgba(253, 86, 60, 0);
+                            border-color: rgba(253, 86, 60, 0.9);
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+
+                const bannerDiv = document.createElement("div");
                 bannerDiv.id = DIV_NAME;
-                bannerDiv.style.width = "624px";
-                bannerDiv.style.height = "80px";
+                bannerDiv.style.width = `${config.adType.width * 1.3}px`;
+                bannerDiv.style.height = `${config.adType.height * 1.3}px`;
                 bannerDiv.style.margin = "0 auto";
-                bannerDiv.style.marginBottom = "20px";  // Space below
-                bannerDiv.style.display = "block"; // Ensure banner is block level
+                bannerDiv.style.marginBottom = "20px";
+                bannerDiv.style.display = "block";
+                bannerDiv.style.border = "2px solid #fd563c";
+                bannerDiv.style.borderRadius = "4px";
+                bannerDiv.style.overflow = "hidden";
+                bannerDiv.style.position = "relative";
+                bannerDiv.style.animation = "pulseBorder 2s infinite";
+                bannerDiv.style.backgroundColor = "white";
 
-                // Add a rounded black border
-                bannerDiv.style.border = "0.5px solid gray"; // Thinner border
-                bannerDiv.style.borderRadius = "4px"; // Rounded corners
-                bannerDiv.style.overflow = "hidden"; // Prevent image from overflowing rounded corners
-
-                // Set position relative for the banner
-                bannerDiv.style.position = "relative"; // For label positioning
-
-                // Create a label for the ad
-                var label = document.createElement("div");
-                label.innerText = "Ad"; // Label text
-                label.style.color = "white"; // Label text color
-                label.style.backgroundColor = "rgb(14, 131, 69)"; // Label background color
-                label.style.position = "absolute"; // Position it absolutely
-                label.style.padding = "2px 5px"; // Padding around label
-                label.style.zIndex = "1"; // Ensure it's above other content
-                label.style.top = "5px"; // Position from top
-                label.style.left = "5px"; // Position from left
+                const label = document.createElement("div");
+                label.innerText = "Ad";
+                label.style.color = "white";
+                label.style.backgroundColor = "rgb(14, 131, 69)";
+                label.style.position = "absolute";
+                label.style.padding = "2px 5px";
+                label.style.zIndex = "1";
+                label.style.top = "5px";
+                label.style.left = "5px";
                 label.style.borderRadius = "4px";
                 label.style.fontSize = "14px";
                 label.style.fontWeight = "500";
 
-                // Append label to banner div
-                bannerDiv.appendChild(label);
-
-                var bannerImg = document.createElement("img");
+                const bannerImg = document.createElement("img");
                 bannerImg.src = imageURLs[0];
                 bannerImg.alt = "Banner";
                 bannerImg.style.width = "100%";
                 bannerImg.style.height = "100%";
 
-                var bannerLink = document.createElement("a");
-                bannerLink.href = clickURLs[0];  // The URL to redirect to
+                const bannerLink = document.createElement("a");
+                bannerLink.href = clickURLs[0];
 
                 bannerLink.addEventListener('click', () => {
                     showNotification('Click tracked!', 'success');
                 });
 
-                bannerDiv.appendChild(bannerImg);
-                parentDiv.appendChild(bannerDiv);
+                bannerDiv.appendChild(label);
                 bannerLink.appendChild(bannerImg);
                 bannerDiv.appendChild(bannerLink);
+                parentDiv.appendChild(bannerDiv);
+
                 console.log("Banner injected successfully!");
             }
         } else {

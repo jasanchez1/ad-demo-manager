@@ -74,30 +74,30 @@
 <script lang="ts">
 import { Ref, ref, onMounted } from '@vue/runtime-core'
 import { AdForm } from './components/AdForm'
-import type { Site, AdType, AdConfig,KevelAPIResponse, SiteResponse, AdTypeResponse } from '../src/types'
+import type { Site, AdType, AdConfig, KevelAPIResponse, SiteResponse, AdTypeResponse } from '../src/types'
 
 
 class KevelApiError extends Error {
-    status: number;
-    constructor(status: number, message: string) {
-        super(message);
-        this.status = status;
-        this.name = 'KevelApiError';
-    }
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = 'KevelApiError';
+  }
 }
 
 class UnauthorizedError extends KevelApiError {
-    constructor(message: string = 'Invalid API key') {
-        super(401, message);
-        this.name = 'UnauthorizedError';
-    }
+  constructor(message: string = 'Invalid API key') {
+    super(401, message);
+    this.name = 'UnauthorizedError';
+  }
 }
 
 enum Page {
-    Settings = "settings",
-    AdConfigs = "adConfigs",
-    EditConfig = "editConfig",
-    CreateConfig = "createConfig"
+  Settings = "settings",
+  AdConfigs = "adConfigs",
+  EditConfig = "editConfig",
+  CreateConfig = "createConfig"
 }
 
 
@@ -202,7 +202,7 @@ const getEmptyNewAd = (): AdConfig => ({
 
 export default {
   components: {
-    AdForm 
+    AdForm
   },
   setup(): Setup {
     const networkId = ref('')
@@ -386,6 +386,10 @@ export default {
       if (config) {
         config.isActive = !config.isActive
         saveAdConfigsToStorage()
+        chrome.runtime.sendMessage({
+          type: 'configToggled',
+          url: config.url
+        });
       }
     }
 

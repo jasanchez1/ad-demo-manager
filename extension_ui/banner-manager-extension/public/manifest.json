@@ -5,14 +5,29 @@
   "description": "Manage banner configurations",
   "permissions": [
     "storage",
-    "webRequest"
+    "webRequest",
+    "tabs",
+    "scripting",
+    "activeTab"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "host_permissions": [
-    "https://api.kevel.co/*"
+    "https://api.kevel.co/*",
+    "<all_urls>"
   ],
+  "content_scripts": [
+    {
+        "matches": [
+            "<all_urls>"
+        ],
+        "js": [
+            "content.js"
+        ],
+        "run_at": "document_idle"
+    }
+],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

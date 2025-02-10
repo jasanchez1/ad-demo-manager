@@ -31,4 +31,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }));
     return true; // Keep message channel open for async response
   }
+
+  if (request.type === 'configToggled') {
+    // Find tabs matching the URL pattern and reload them
+    chrome.tabs.query({}, (tabs) => {
+      tabs.forEach(tab => {
+        if (tab.url && tab.url.match(new RegExp(request.url))) {
+          chrome.tabs.reload(tab.id);
+        }
+      });
+    });
+  }
 });

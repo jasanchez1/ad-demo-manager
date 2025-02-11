@@ -73,7 +73,7 @@ function injectAd(config, networkId) {
     function trackImpressionWhenVisible() {
         const banner = document.getElementById(DIV_NAME);
         if (!banner || !impressionURLs) {
-            showNotification("Error tracking impression", "error");
+            console.log("Banner or impression URL not found");
             return;
         }
 
@@ -84,7 +84,7 @@ function injectAd(config, networkId) {
                         if (response.ok) {
                             showNotification("Impression tracked!", "success");
                         }
-                    }).catch(error => {
+                    }).catch(_ => {
                         showNotification("Failed to track impression", "error");
                     });
                     observer.unobserve(banner);
@@ -100,31 +100,14 @@ function injectAd(config, networkId) {
 
         const parentElements = document.getElementsByClassName(config.divId);
         if (parentElements.length > 0) {
-            const parentDiv = parentElements[0];
+            chrome.storage.sync.get(['demoMode'], (result) => {
+                const isDemoMode = result.demoMode || false;
 
-            // Add padding to the parent div to create space below the banner
-            parentDiv.style.paddingBottom = `${config.adType.height * 1.3}px`;  // Adjust as needed
-            parentDiv.style.clear = "both"; // Ensure clear if using floats
+                const parentDiv = parentElements[0];
 
-            if (!document.getElementById(DIV_NAME)) {
-                const style = document.createElement('style');
-                style.textContent = `
-                    @keyframes pulseBorder {
-                        0% {
-                            box-shadow: 0 0 0 0 rgba(253, 86, 60, 0.7);
-                            border-color: rgba(253, 86, 60, 0.9);
-                        }
-                        70% {
-                            box-shadow: 0 0 0 10px rgba(253, 86, 60, 0);
-                            border-color: rgba(253, 86, 60, 0.3);
-                        }
-                        100% {
-                            box-shadow: 0 0 0 0 rgba(253, 86, 60, 0);
-                            border-color: rgba(253, 86, 60, 0.9);
-                        }
-                    }
-                `;
-                document.head.appendChild(style);
+                // Add padding to the parent div to create space below the banner
+                parentDiv.style.paddingBottom = `${config.adType.height * 1.3}px`;  // Adjust as needed
+                parentDiv.style.clear = "both"; // Ensure clear if using floats
 
                 const bannerDiv = document.createElement("div");
                 bannerDiv.id = DIV_NAME;
@@ -133,12 +116,13 @@ function injectAd(config, networkId) {
                 bannerDiv.style.margin = "0 auto";
                 bannerDiv.style.marginBottom = "20px";
                 bannerDiv.style.display = "block";
-                bannerDiv.style.border = "2px solid #fd563c";
+                bannerDiv.style.border = "0.5px solid grey";
                 bannerDiv.style.borderRadius = "4px";
                 bannerDiv.style.overflow = "hidden";
                 bannerDiv.style.position = "relative";
-                bannerDiv.style.animation = "pulseBorder 2s infinite";
                 bannerDiv.style.backgroundColor = "white";
+                bannerDiv.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+                bannerDiv.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1), 0 0 1px rgba(255, 255, 255, 0.1)";
 
                 const label = document.createElement("div");
                 label.innerText = "Ad";
@@ -162,20 +146,44 @@ function injectAd(config, networkId) {
                 const bannerLink = document.createElement("a");
                 bannerLink.href = clickURLs[0];
 
-                bannerLink.addEventListener('click', () => {
-                    showNotification('Click tracked!', 'success');
-                });
+                if (!document.getElementById(DIV_NAME)) {
+                    if (isDemoMode) {
+                        bannerDiv.style.border = "2px solid #fd563c";
+                        bannerDiv.style.animation = "pulseBorder 2s infinite";
+                        const style = document.createElement('style');
+                        style.textContent = `
+                    @keyframes pulseBorder {
+                        0% {
+                            box-shadow: 0 0 0 0 rgba(253, 86, 60, 0.7);
+                            border-color: rgba(253, 86, 60, 0.9);
+                        }
+                        70% {
+                            box-shadow: 0 0 0 10px rgba(253, 86, 60, 0);
+                            border-color: rgba(253, 86, 60, 0.3);
+                        }
+                        100% {
+                            box-shadow: 0 0 0 0 rgba(253, 86, 60, 0);
+                            border-color: rgba(253, 86, 60, 0.9);
+                        }
+                    }
+                `;
+                        document.head.appendChild(style);
+                    }
 
-                bannerDiv.appendChild(label);
-                bannerLink.appendChild(bannerImg);
-                bannerDiv.appendChild(bannerLink);
-                parentDiv.appendChild(bannerDiv);
+                    bannerLink.addEventListener('click', () => {
+                        showNotification('Click tracked!', 'success');
+                    });
 
-                console.log("Banner injected successfully!");
-            }
+                    bannerDiv.appendChild(label);
+                    bannerLink.appendChild(bannerImg);
+                    bannerDiv.appendChild(bannerLink);
+                    parentDiv.appendChild(bannerDiv);
+
+                    console.log("Banner injected successfully!");
+                }
+            });
         } else {
             console.log("Parent element not found!");
-            console.log(config.divId);
         }
     }
 

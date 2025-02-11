@@ -26,6 +26,17 @@
               @click="navigateBack">Cancel</button>
             <button @click="saveSettings" :disabled="isLoading"> {{ isLoading ? 'Saving...' : 'Save' }} </button>
           </div>
+          <div class="input-group">
+            <label class="toggle-label">
+              Demo Mode
+              <div class="toggle-wrapper">
+                <label class="toggle" @click.stop>
+                  <input type="checkbox" v-model="demoMode" @change="saveDemoMode">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </label>
+          </div>
         </div>
       </div>
       <div v-if="currentPage === Page.AdConfigs">
@@ -432,6 +443,32 @@ export default {
       })
     }
 
+    const demoMode = ref(false)
+
+    // Load demo mode setting
+    const loadDemoMode = () => {
+      chrome.storage.sync.get(['demoMode'], (result) => {
+        demoMode.value = result.demoMode || false
+      })
+    }
+
+    const saveDemoMode = () => {
+      chrome.storage.sync.set({
+        demoMode: demoMode.value
+      })
+
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.reload(tabs[0].id);
+        }
+      });
+    }
+
+    onMounted(() => {
+      loadSavedValues()
+      loadDemoMode()
+    })
+
     return {
       networkId,
       apiKey,
@@ -457,6 +494,8 @@ export default {
       Page,
       isLoading,
       newAd,
+      demoMode,
+      saveDemoMode
     }
   }
 }
@@ -807,5 +846,17 @@ button:disabled {
   justify-content: center;
   width: 18px;
   height: 18px;
+}
+
+.toggle-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.toggle-wrapper {
+  display: flex;
+  align-items: center;
 }
 </style>

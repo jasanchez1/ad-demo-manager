@@ -84,12 +84,10 @@
         </div>
 
         <AdForm v-if="currentPage === Page.EditConfig && selectedAd" :ad-data="selectedAd" :ad-types="adTypes"
-          :sites="sites" :is-edit="true" @save="saveAdDetails" @cancel="closeAdDetails" :is-picking="isPicking"
-          @start-picking="isPicking = true" @end-picking="isPicking = false" />
+          :sites="sites" :is-edit="true" @start-picking="startPicking" @save="saveAdDetails" @cancel="closeAdDetails" />
 
         <AdForm v-if="currentPage === Page.CreateConfig" :ad-data="newAd" :ad-types="adTypes" :sites="sites"
-          :is-edit="false" @save="saveNewAd" @cancel="cancelCreateAd" :is-picking="isPicking"
-          @start-picking="isPicking = true" @end-picking="isPicking = false" />
+          :is-edit="false" @start-picking="startPicking" @save="saveNewAd" @cancel="cancelCreateAd" />
 
         <div v-if="message" :class="['message', messageType]">
           {{ message }}
@@ -202,6 +200,7 @@ interface Setup {
   saveDemoMode: () => void;
   formatContainerId: (id: string) => string;
   cancelPicking: () => void;
+  startPicking: () => void;
   currentContainer: Ref<string>;
   isPicking: Ref<boolean>;
   networkId: Ref<string>;
@@ -286,6 +285,38 @@ export default {
     const closeAdDetails = () => {
       selectedAd.value = null
       navigateTo(Page.AdConfigs);
+    }
+
+
+    const startPicking = () => {
+      isPicking.value = true;  // Make sure we set this first
+
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          const elementSelectionHandler = (message: any, sender: any, sendResponse: any) => {
+            console.log('Message received:', message); // Debug log
+            if (message.type === 'elementSelected') {
+              if (currentPage.value === Page.EditConfig && selectedAd.value) {
+                selectedAd.value.divId = message.elementInfo.value;
+              } else if (currentPage.value === Page.CreateConfig) {
+                newAd.value.divId = message.elementInfo.value;
+              }
+              chrome.runtime.onMessage.removeListener(elementSelectionHandler);
+              chrome.tabs.sendMessage(tabs[0].id!, { action: 'toggleExtension' });
+              isPicking.value = false;
+            }
+          };
+
+          chrome.runtime.onMessage.addListener(elementSelectionHandler);
+
+          chrome.tabs.sendMessage(tabs[0].id!, { action: 'toggleExtension' }, (response) => {
+            console.log('Toggle response:', response); // Debug log
+            if (chrome.runtime.lastError) {
+              console.error('Error:', chrome.runtime.lastError);
+            }
+          });
+        }
+      });
     }
 
     onMounted(() => {
@@ -555,7 +586,8 @@ export default {
       isPicking,
       currentContainer,
       formatContainerId,
-      cancelPicking
+      cancelPicking,
+      startPicking
     }
   }
 }

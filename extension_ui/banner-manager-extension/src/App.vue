@@ -1,89 +1,106 @@
 <template>
-  <div class="app-container">
-    <div class="header">
-      <img src="/icon.jpg" alt="Banner Manager Icon" class="header-icon" />
-      <h1 class="title">Ad Demo Manager</h1>
-      <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey" @click="navigateTo(Page.Settings)">
-        <div class="saved-item">Network ID: {{ savedValues.networkId }}</div>
-        <div class="saved-item">API Key: **********</div>
+  <div class="app-container" :class="{ 'picking-mode': isPicking }">
+    <div v-if="isPicking" class="picking-header">
+      <div class="picking-content">
+        <img src="/icon.jpg" alt="Banner Manager Icon" class="header-icon" />
+        <div class="picking-text-container">
+          <span class="picking-instruction">Select where you want to place your ad</span>
+          <span class="picking-container-id">
+            {{ currentContainer ? `Container ID: ${formatContainerId(currentContainer)}` : '\u00A0' }}
+          </span>
+        </div>
+        <button class="cancel-pick" @click="cancelPicking">Cancel</button>
       </div>
     </div>
-    <div class="content">
-      <div class="settings" v-if="currentPage === Page.Settings">
-        <h3 class="title">Network Settings</h3>
-        <h5 class="menu-description">Before continuing, you need to set configure your network settings</h5>
-        <div class="form">
-          <div class="input-group">
-            <label>Network ID</label>
-            <input type="text" v-model="networkId" placeholder='Enter Network'>
+
+    <div v-else>
+      <div class="header">
+        <img src="/icon.jpg" alt="Banner Manager Icon" class="header-icon" />
+        <h1 class="title">Ad Demo Manager</h1>
+        <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey" @click="navigateTo(Page.Settings)">
+          <div class="saved-item">Network ID: {{ savedValues.networkId }}</div>
+          <div class="saved-item">API Key: **********</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="settings" v-if="currentPage === Page.Settings">
+          <h3 class="title">Network Settings</h3>
+          <h5 class="menu-description">Before continuing, you need to set configure your network settings</h5>
+          <div class="form">
+            <div class="input-group">
+              <label>Network ID</label>
+              <input type="text" v-model="networkId" placeholder='Enter Network'>
+            </div>
+            <div class="input-group">
+              <label>API Key</label>
+              <input type="text" v-model="apiKey" placeholder='Enter API Key'>
+            </div>
+            <div class="actions">
+              <button v-if="savedValues.networkId && savedValues.apiKey" class="secondary"
+                @click="navigateBack">Cancel</button>
+              <button @click="saveSettings" :disabled="isLoading"> {{ isLoading ? 'Saving...' : 'Save' }} </button>
+            </div>
+            <div class="input-group">
+              <label class="toggle-label">
+                Demo Mode
+                <div class="toggle-wrapper">
+                  <label class="toggle" @click.stop>
+                    <input type="checkbox" v-model="demoMode" @change="saveDemoMode">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+              </label>
+            </div>
           </div>
-          <div class="input-group">
-            <label>API Key</label>
-            <input type="text" v-model="apiKey" placeholder='Enter API Key'>
-          </div>
-          <div class="actions">
-            <button v-if="savedValues.networkId && savedValues.apiKey" class="secondary"
-              @click="navigateBack">Cancel</button>
-            <button @click="saveSettings" :disabled="isLoading"> {{ isLoading ? 'Saving...' : 'Save' }} </button>
-          </div>
-          <div class="input-group">
-            <label class="toggle-label">
-              Demo Mode
-              <div class="toggle-wrapper">
+        </div>
+        <div v-if="currentPage === Page.AdConfigs">
+          <h3 class="title">Ad Configurations</h3>
+          <div class="ad-list">
+            <div v-for="config in adConfigs" :key="config.id" class="ad-item" @click="openAdDetails(config)">
+              <div class="ad-info">
+                <div class="ad-header">
+                  <span class="ad-name">{{ config.name }}</span>
+                  <span class="ad-type-badge">{{ `${config.adType.name} -
+                    ${config.adType.width}x${config.adType.height}`
+                    }}</span>
+                </div>
+                <div class="ad-details">
+                  <div class="ad-site">{{ config.site.name }}</div>
+                  <div class="ad-url">{{ config.url }}</div>
+                </div>
+              </div>
+              <div class="ad-config-actions">
                 <label class="toggle" @click.stop>
-                  <input type="checkbox" v-model="demoMode" @change="saveDemoMode">
+                  <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
                   <span class="slider"></span>
                 </label>
-              </div>
-            </label>
-          </div>
-        </div>
-      </div>
-      <div v-if="currentPage === Page.AdConfigs">
-        <h3 class="title">Ad Configurations</h3>
-        <div class="ad-list">
-          <div v-for="config in adConfigs" :key="config.id" class="ad-item" @click="openAdDetails(config)">
-            <div class="ad-info">
-              <div class="ad-header">
-                <span class="ad-name">{{ config.name }}</span>
-                <span class="ad-type-badge">{{ `${config.adType.name} -
-                  ${config.adType.width}x${config.adType.height}`
-                  }}</span>
-              </div>
-              <div class="ad-details">
-                <div class="ad-site">{{ config.site.name }}</div>
-                <div class="ad-url">{{ config.url }}</div>
+                <label class="delete" @click.stop="deleteAdConfig(config.id)">
+                  <span class="delete-icon">×</span>
+                </label>
               </div>
             </div>
-            <div class="ad-config-actions">
-              <label class="toggle" @click.stop>
-                <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
-                <span class="slider"></span>
-              </label>
-              <label class="delete" @click.stop="deleteAdConfig(config.id)">
-                <span class="delete-icon">×</span>
-              </label>
-            </div>
           </div>
+          <button class="create-button" @click="createNewAd">Create New Ad Config</button>
         </div>
-        <button class="create-button" @click="createNewAd">Create New Ad Config</button>
-      </div>
 
-      <AdForm v-if="currentPage === Page.EditConfig && selectedAd" :ad-data="selectedAd" :ad-types="adTypes"
-        :sites="sites" :is-edit="true" @save="saveAdDetails" @cancel="closeAdDetails" />
+        <AdForm v-if="currentPage === Page.EditConfig && selectedAd" :ad-data="selectedAd" :ad-types="adTypes"
+          :sites="sites" :is-edit="true" @save="saveAdDetails" @cancel="closeAdDetails" :is-picking="isPicking"
+          @start-picking="isPicking = true" @end-picking="isPicking = false" />
 
-      <AdForm v-if="currentPage === Page.CreateConfig" :ad-data="newAd" :ad-types="adTypes" :sites="sites"
-        :is-edit="false" @save="saveNewAd" @cancel="cancelCreateAd" />
+        <AdForm v-if="currentPage === Page.CreateConfig" :ad-data="newAd" :ad-types="adTypes" :sites="sites"
+          :is-edit="false" @save="saveNewAd" @cancel="cancelCreateAd" :is-picking="isPicking"
+          @start-picking="isPicking = true" @end-picking="isPicking = false" />
 
-      <div v-if="message" :class="['message', messageType]">
-        {{ message }}
+        <div v-if="message" :class="['message', messageType]">
+          {{ message }}
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { Ref, ref, onMounted } from '@vue/runtime-core'
+import { Ref, ref, onMounted, watch } from '@vue/runtime-core'
 import { AdForm } from './components/AdForm'
 import type { Site, AdType, AdConfig, KevelAPIResponse, SiteResponse, AdTypeResponse } from '../src/types'
 
@@ -182,6 +199,11 @@ interface Setup {
   openAdDetails: (config: AdConfig) => void;
   closeAdDetails: () => void;
   deleteAdConfig: (id: number) => void;
+  saveDemoMode: () => void;
+  formatContainerId: (id: string) => string;
+  cancelPicking: () => void;
+  currentContainer: Ref<string>;
+  isPicking: Ref<boolean>;
   networkId: Ref<string>;
   apiKey: Ref<string>;
   message: Ref<string>;
@@ -198,6 +220,7 @@ interface Setup {
   Page: typeof Page;
   isLoading: Ref<boolean>;
   newAd: Ref<AdConfig>;
+  demoMode: Ref<boolean>;
 }
 
 const getEmptyNewAd = (): AdConfig => ({
@@ -220,6 +243,7 @@ export default {
     const apiKey = ref('')
     const message = ref('')
     const messageType = ref('')
+    const isPicking = ref(false)
     const savedValues = ref({ networkId: '', apiKey: '' })
     const currentPage = ref<Page>(Page.AdConfigs)
     const lastPage = ref<Page>(Page.AdConfigs)
@@ -229,6 +253,20 @@ export default {
     const adConfigs = ref<AdConfig[]>([])
     const newAd = ref<AdConfig>(getEmptyNewAd())
     const selectedAd = ref<AdConfig | null>(null)
+    const currentContainer = ref('')
+
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.type === 'containerHover') {
+        if (message.elementInfo.type === 'id') {
+          currentContainer.value = message.elementInfo.value;
+        } else if (message.elementInfo.type === 'class name') {
+          currentContainer.value = `${message.elementInfo.value}`;
+        }
+        else {
+          currentContainer.value = '';
+        }
+      }
+    });
 
     const navigateTo = (page: Page) => {
       lastPage.value = currentPage.value;
@@ -252,7 +290,12 @@ export default {
 
     onMounted(() => {
       loadSavedValues()
+      document.documentElement.setAttribute('data-picking', isPicking.value.toString());
     })
+
+    watch(() => isPicking.value, (newValue: boolean) => {
+      document.documentElement.setAttribute('data-picking', newValue.toString());
+    });
 
     const fetchNetworkDetails = async (apiKey: string) => {
       try {
@@ -271,6 +314,10 @@ export default {
           message: 'Error communicating with the Kevel API'
         }
       }
+    }
+
+    const formatContainerId = (id: string) => {
+      return id.length > 20 ? id.slice(0, 20) + '...' : id;
     }
 
     // Validation function
@@ -464,6 +511,15 @@ export default {
       });
     }
 
+    const cancelPicking = () => {
+      isPicking.value = false;
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]?.id) {
+          chrome.tabs.sendMessage(tabs[0].id!, { action: 'toggleExtension' });
+        }
+      });
+    }
+
     onMounted(() => {
       loadSavedValues()
       loadDemoMode()
@@ -495,7 +551,11 @@ export default {
       isLoading,
       newAd,
       demoMode,
-      saveDemoMode
+      saveDemoMode,
+      isPicking,
+      currentContainer,
+      formatContainerId,
+      cancelPicking
     }
   }
 }
@@ -858,5 +918,60 @@ button:disabled {
 .toggle-wrapper {
   display: flex;
   align-items: center;
+}
+
+.app-container.picking-mode {
+  height: auto;
+  min-height: auto;
+}
+
+.picking-header {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: #001830;
+  border-bottom: 1px solid #3182ce;
+}
+
+.picking-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.picking-text {
+  color: white;
+  font-size: 12px;
+}
+
+.picking-text-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 42px;
+}
+
+.picking-instruction {
+  color: white;
+  font-size: 12px;
+}
+
+.picking-container-id {
+  color: #3182ce;
+  font-size: 11px;
+  font-weight: 500;
+  min-height: 14px;
+}
+
+.cancel-pick {
+  margin-left: auto;
+  width: auto !important;
+  background: transparent;
+  border: 1px solid #fd563c;
+  color: #fd563c;
+  padding: 4px 12px;
+  height: 24px;
+  font-size: 12px;
 }
 </style>

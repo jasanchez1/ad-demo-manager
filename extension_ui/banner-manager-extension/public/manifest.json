@@ -19,16 +19,29 @@
   ],
   "content_scripts": [
     {
-        "matches": [
-            "<all_urls>"
-        ],
-        "js": [
-            "content.js", "elementPicker.js"
-        ],
-        "run_at": "document_idle",
-        "css": ["styles.css"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js",
+        "picker.js"
+      ],
+      "run_at": "document_idle",
+      "css": [
+        "styles.css"
+      ]
     }
-],
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icon48.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

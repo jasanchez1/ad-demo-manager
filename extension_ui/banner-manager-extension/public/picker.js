@@ -1,230 +1,221 @@
 // Debug logging function
 function debugLog(message) {
     console.log(`[Element Picker] ${message}`);
-  }
-  
-  debugLog('Picker script loaded');
-  
-  function initDisplayInfoElement(initialMessage) {
-    // Create main container (picking-header)
+}
+
+function formatContainerId(id) {
+    return id.length > 20 ? id.slice(0, 20) + '...' : id;
+}
+
+debugLog('Picker script loaded');
+
+function initDisplayInfoElement(initialMessage) {
     const infoDisplay = document.createElement('div');
-    infoDisplay.className = 'picking-header';
-    infoDisplay.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      display: flex;
-      align-items: center;
-      padding: 12px;
-      background: #001830;
-      border-bottom: 1px solid #3182ce;
-      z-index: 2147483647;
-      display: none;
-    `;
-  
-    // Create content container (picking-content)
+    infoDisplay.className = 'element-info-display';
+    infoDisplay.style.display = 'none';
+
     const content = document.createElement('div');
     content.className = 'picking-content';
-    content.style.cssText = `
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      width: 100%;
-    `;
-  
-    // Create icon
+
     const icon = document.createElement('img');
     icon.src = chrome.runtime.getURL('icon48.png');
+    icon.alt = 'Banner Manager Icon';
     icon.className = 'header-icon';
-    icon.style.cssText = `
-      width: 24px;
-      height: 24px;
-    `;
-  
-    // Create text container (picking-text-container)
+
     const textContainer = document.createElement('div');
     textContainer.className = 'picking-text-container';
-    textContainer.style.cssText = `
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-height: 42px;
-    `;
-  
-    // Create instruction text
-    const instruction = document.createElement('span');
-    instruction.className = 'picking-instruction';
-    instruction.textContent = 'Select where you want to place your ad';
-    instruction.style.cssText = `
-      color: white;
-      font-size: 12px;
-    `;
-  
-    // Create container ID text
-    const containerId = document.createElement('span');
-    containerId.className = 'picking-container-id';
-    containerId.style.cssText = `
-      color: #3182ce;
-      font-size: 11px;
-      font-weight: 500;
-      min-height: 14px;
-    `;
-    containerId.textContent = initialMessage;
-  
-    // Create cancel button
+
+    const message = document.createElement('span');
+    message.className = 'picking-instruction';
+    message.textContent = initialMessage;
+
+    const containerInfo = document.createElement('span');
+    containerInfo.className = 'picking-container-id';
+    containerInfo.innerHTML = '&nbsp;';
+
     const cancelButton = document.createElement('button');
-    cancelButton.className = 'cancel-pick';
+    cancelButton.className = 'cancel-button';
     cancelButton.textContent = 'Cancel';
-    cancelButton.style.cssText = `
-      margin-left: auto;
-      width: auto !important;
-      background: transparent;
-      border: 1px solid #fd563c;
-      color: #fd563c;
-      padding: 4px 12px;
-      height: 24px;
-      font-size: 12px;
-      border-radius: 4px;
-      cursor: pointer;
-    `;
-  
-    // Add hover effect to cancel button
-    cancelButton.addEventListener('mouseover', () => {
-      cancelButton.style.backgroundColor = 'rgba(253, 86, 60, 0.1)';
-    });
-    cancelButton.addEventListener('mouseout', () => {
-      cancelButton.style.backgroundColor = 'transparent';
-    });
-  
-    // Add click handler to cancel button
-    cancelButton.addEventListener('click', () => {
-      isActive = false;
-      infoDisplay.style.display = 'none';
-      if (lastHighlightedElement) {
-        lastHighlightedElement.classList.remove('inspector-highlight');
-      }
-      if (selectedElement) {
-        selectedElement.classList.remove('inspector-selected');
-      }
-      selectedElement = null;
-      lastHighlightedElement = null;
-    });
-  
+
     // Assemble the elements
-    textContainer.appendChild(instruction);
-    textContainer.appendChild(containerId);
+    textContainer.appendChild(message);
+    textContainer.appendChild(containerInfo);
     content.appendChild(icon);
     content.appendChild(textContainer);
     content.appendChild(cancelButton);
     infoDisplay.appendChild(content);
     document.body.appendChild(infoDisplay);
-  
-    debugLog('Info display element created');
-    return {
-      element: infoDisplay,
-      containerId: containerId
-    };
-  }
 
-  // Ready to select message
-  const selectReadyMessage = 'Hover over elements to select container';
-  const { element: infoDisplay, containerId } = initDisplayInfoElement(selectReadyMessage);
-  
-  // Track if picker is active
-  let isActive = false;
-  let lastHighlightedElement = null;
-  let selectedElement = null;
-  
-  // Function to get element details
-  function getElementInfo(element) {
+    // Update the cancel button click handler
+    cancelButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        isActive = false;
+        infoDisplay.style.display = 'none';
+
+        if (lastHighlightedElement) {
+            lastHighlightedElement.classList.remove('inspector-highlight');
+        }
+        if (selectedElement) {
+            selectedElement.classList.remove('inspector-selected');
+        }
+        selectedElement = null;
+        lastHighlightedElement = null;
+
+        chrome.runtime.sendMessage({
+            type: 'pickingCanceled'
+        });
+    });
+
+    return {
+        element: infoDisplay,
+        message: message,
+        containerInfo: containerInfo
+    };
+}
+
+// Ready to select message
+const selectReadyMessage = 'Hover and select a container';
+const { element: infoDisplay, message, containerInfo } = initDisplayInfoElement(selectReadyMessage);
+
+// Track if picker is active
+let isActive = false;
+let lastHighlightedElement = null;
+let selectedElement = null;
+
+// Function to get element details
+function getElementInfo(element) {
     if (element.id) {
-      return { type: "id", value: element.id };
+        return { type: "id", value: element.id };
     }
-  
+
     if (element.className) {
-      const classes = element.className.split(' ')
-        .filter(cls => !['inspector-highlight', 'inspector-selected'].includes(cls))
-        .join(' ');
-      if (classes) {
-        return { type: "class name", value: classes };
-      }
+        const classes = element.className.split(' ')
+            .filter(cls => !['inspector-highlight', 'inspector-selected'].includes(cls))
+            .join(' ');
+        if (classes) {
+            return { type: "class name", value: classes };
+        }
     }
     return { type: "error", value: "No identifier found" };
-  }
-  
-  function setSelectedElementInfo(element) {
+}
+
+function setSelectedElementInfo(element) {
     const elementInfo = getElementInfo(element);
-    containerId.textContent = 'Selected container: ' + elementInfo.value;
-  }
-  
-  // Listen for picker activation message
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    containerInfo.textContent = 'Container: ' + formatContainerId(elementInfo.value);
+}
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     debugLog(`Message received: ${JSON.stringify(request)}`);
-  
+
     if (request.action === 'startPicking') {
-      isActive = true;
-      debugLog('Picker activated');
-  
-      infoDisplay.style.display = 'block';
-      infoDisplay.textContent = selectReadyMessage;
-  
-      sendResponse({ status: 'activated' });
+        isActive = true;
+        debugLog('Picker activated');
+
+        infoDisplay.style.display = 'block';
+        message.textContent = selectReadyMessage;
+
+        sendResponse({ status: 'activated' });
     }
-  });
-  
-  // Hover handling
-  document.addEventListener('mouseover', function(event) {
+});
+
+// Click handling
+document.addEventListener('click', function (event) {
     if (!isActive) return;
-  
-    const targetElement = event.target;
-  
-    if (lastHighlightedElement && lastHighlightedElement !== selectedElement) {
-      lastHighlightedElement.classList.remove('inspector-highlight');
-    }
-  
-    if (targetElement === infoDisplay) return;
-  
-    if (!selectedElement) {
-      targetElement.classList.add('inspector-highlight');
-      lastHighlightedElement = targetElement;
-    }
-  }, true);
-  
-  document.addEventListener('mouseout', function(event) {
-    if (!isActive) return;
-    const targetElement = event.target;
-  
-    if (targetElement !== selectedElement) {
-      targetElement.classList.remove('inspector-highlight');
-    }
-  }, true);
-  
-  // Click handling
-  document.addEventListener('click', function(event) {
-    if (!isActive) return;
-  
+
     event.preventDefault();
     event.stopPropagation();
-  
+
     const targetElement = event.target;
-  
-    if (targetElement === infoDisplay) return;
-  
+
+    // Check if clicking the cancel button
+    if (targetElement.classList.contains('cancel-button')) {
+        isActive = false;
+        infoDisplay.style.display = 'none';
+        if (lastHighlightedElement) {
+            lastHighlightedElement.classList.remove('inspector-highlight');
+        }
+        if (selectedElement) {
+            selectedElement.classList.remove('inspector-selected');
+        }
+        selectedElement = null;
+        lastHighlightedElement = null;
+        chrome.runtime.sendMessage({
+            type: 'pickingCanceled'
+        });
+        return;
+    }
+
     if (!selectedElement) {
-      selectedElement = targetElement;
-      selectedElement.classList.add('inspector-selected');
-      setSelectedElementInfo(infoDisplay, selectedElement);
-      debugLog(`Element selected: ${targetElement.tagName}`);
+        selectedElement = targetElement;
+        selectedElement.classList.add('inspector-selected');
+        
+        const elementInfo = getElementInfo(selectedElement);
+        containerInfo.textContent = `Selected container: ${formatContainerId(elementInfo.value)}`;
+        containerInfo.classList.add('selected'); // Just add selected class
     }
-  }, true);
-  
-  // Prevent clicks while active
-  document.addEventListener('click', function(event) {
-    if (isActive) {
-      event.preventDefault();
-      event.stopPropagation();
+
+    // Check if clicking the info display
+    if (targetElement === infoDisplay || infoDisplay.contains(targetElement)) {
+        return;
     }
-  }, true);
-  
-  debugLog('Picker script initialized');
+
+    // Handle element selection
+    selectedElement = targetElement;
+    selectedElement.classList.add('inspector-selected');
+
+    const elementInfo = getElementInfo(selectedElement);
+    containerInfo.textContent = `Selected container: ${formatContainerId(elementInfo.value)}`;
+
+    chrome.runtime.sendMessage({
+        type: 'elementSelected',
+        elementInfo: elementInfo
+    });
+}, true);
+
+// Update mouseover to respect selection
+document.addEventListener('mouseover', function (event) {
+    if (!isActive) return;
+
+    const targetElement = event.target;
+
+    if (targetElement === infoDisplay || infoDisplay.contains(targetElement)) return;
+
+    if (lastHighlightedElement && lastHighlightedElement !== selectedElement) {
+        lastHighlightedElement.classList.remove('inspector-highlight');
+    }
+
+    function formatContainerId(id) {
+        return id.length > 20 ? id.slice(0, 20) + '...' : id;
+    }
+
+    if (!selectedElement) {
+        targetElement.classList.add('inspector-highlight');
+        lastHighlightedElement = targetElement;
+
+        const elementInfo = getElementInfo(targetElement);
+        containerInfo.textContent = `Container: ${formatContainerId(elementInfo.value)}`;
+        containerInfo.style.color = '#4299e1';  // Blue for hover state
+    }
+}, true);
+
+
+document.addEventListener('mouseout', function (event) {
+    if (!isActive) return;
+
+    const targetElement = event.target;
+
+    if (targetElement === infoDisplay || infoDisplay.contains(targetElement)) return;
+
+    if (targetElement !== selectedElement) {
+        targetElement.classList.remove('inspector-highlight');
+        // Only reset text if no selection
+        if (!selectedElement) {
+            containerInfo.textContent = '\u00A0';
+        }
+    }
+}, true);
+
+
+debugLog('Picker script initialized');

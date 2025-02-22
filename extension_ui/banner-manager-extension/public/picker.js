@@ -76,7 +76,7 @@ function initDisplayInfoElement(initialMessage) {
 }
 
 // Ready to select message
-const selectReadyMessage = 'Hover and select a container';
+const selectReadyMessage = 'Click where you want to place your Ad';
 const { element: infoDisplay, message, containerInfo } = initDisplayInfoElement(selectReadyMessage);
 
 // Track if picker is active

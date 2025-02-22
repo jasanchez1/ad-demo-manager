@@ -2,40 +2,52 @@
   <div class="ad-form-container">
     <h3 class="title">{{ isEdit ? 'Edit' : 'Create New' }} Ad Configuration</h3>
     <div class="ad-details-modal">
-      <div class="input-group">
-        <label>Name</label>
+      <div class="input-group" :class="{ required: adData.keywordQueryParam }">
+        <label>Name <span v-if="adData.keywordQueryParam" class="required-marker">*</span></label>
         <input type="text" v-model="adData.name">
       </div>
-      <div class="input-group">
-        <label>Ad Type</label>
+
+      <div class="input-group" :class="{ required: adData.keywordQueryParam }">
+        <label>Ad Type <span v-if="adData.keywordQueryParam" class="required-marker">*</span></label>
         <select v-model="adData.adType.id">
           <option v-for="type in adTypes" :key="type.id" :value="type.id">
             {{ type.name + ' - ' + type.width + 'x' + type.height }}
           </option>
         </select>
       </div>
-      <div class="input-group">
-        <label>Site</label>
+
+      <div class="input-group" :class="{ required: adData.keywordQueryParam }">
+        <label>Site <span v-if="adData.keywordQueryParam" class="required-marker">*</span></label>
         <select v-model="adData.site.id">
           <option v-for="site in sites" :key="site.id" :value="site.id">
             {{ site.name }}
           </option>
         </select>
       </div>
-      <div class="input-group">
-        <label>URL Pattern</label>
+
+      <div class="input-group" :class="{ required: adData.keywordQueryParam }">
+        <label>URL Pattern <span v-if="adData.keywordQueryParam" class="required-marker">*</span></label>
         <input type="text" v-model="adData.url" placeholder="e.g., https://example.com/*">
       </div>
-      <div class="input-group">
-        <label>Container ID</label>
+
+      <div class="input-group" :class="{ required: adData.keywordQueryParam }">
+        <label>Container ID <span v-if="adData.keywordQueryParam" class="required-marker">*</span></label>
         <div class="container-id-group">
           <input type="text" v-model="adData.divId" placeholder="HTML element ID">
           <button class="pick-button" @click="startPicking" type="button">Pick</button>
         </div>
       </div>
       <div class="input-group">
-        <label>Keyword URL Parameter</label>
+        <label>
+          Keyword URL Parameter
+          <span class="optional-label">
+            (Optional)
+          </span>
+        </label>
         <input type="text" v-model="adData.keywordQueryParam" placeholder="Optional: URL parameter for keywords">
+      </div>
+      <div v-if="errors.length" class="error-messages">
+        <p v-for="(error, index) in errors" :key="index">{{ error }}</p>
       </div>
       <div class="actions">
         <button class="secondary" @click="onCancel">Cancel</button>
@@ -47,6 +59,7 @@
 
 <script setup lang="ts">
 import type { AdConfig, AdType, Site } from '../../types'
+import { ref } from 'vue'
 
 interface Props {
   adData: AdConfig
@@ -67,7 +80,29 @@ const startPicking = () => {
   emit('start-picking')
 }
 
-const onSave = () => emit('save', props.adData)
+const errors = ref<string[]>([])
+
+const validateForm = () => {
+  errors.value = []
+  const { name, adType, site, url, divId, keywordQueryParam } = props.adData
+
+  if (keywordQueryParam) {
+    if (!name) errors.value.push('Name is required.')
+    if (!adType?.id) errors.value.push('Ad Type is required.')
+    if (!site?.id) errors.value.push('Site is required.')
+    if (!url) errors.value.push('URL Pattern is required.')
+    if (!divId) errors.value.push('Container ID is required.')
+  }
+
+  return errors.value.length === 0
+}
+
+const onSave = () => {
+  if (validateForm()) {
+    emit('save', props.adData)
+  }
+}
+
 const onCancel = () => emit('cancel')
 </script>
 
@@ -141,5 +176,11 @@ button {
   background: transparent;
   border: 1px solid #fd563c;
   color: #fd563c;
+}
+
+.error-messages {
+  color: red;
+  font-size: 12px;
+  margin-bottom: 8px;
 }
 </style>

@@ -104,3 +104,35 @@
 .cancel-button:hover {
   background-color: rgba(220, 53, 69, 0.1);
 }
+
+.confirm-button:hover {
+  background-color: rgba(66, 153, 225, 0.1);
+}
+
+/* When in confirmation mode, disable hover highlights */
+.confirmation-mode .inspector-highlight {
+  display: none;
+}
+
+.button-container {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.confirm-button {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  height: 28px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid #4299e1;
+  color: #4299e1;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}

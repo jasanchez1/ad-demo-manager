@@ -52,4 +52,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
   }
 
+  if (request.type === 'reopenExtension') {
+    chrome.action.openPopup();
+  }
+
 });

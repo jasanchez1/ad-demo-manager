@@ -48,7 +48,7 @@
                 <span class="ad-name">{{ config.name }}</span>
                 <span class="ad-type-badge">{{ `${config.adType.name} -
                   ${config.adType.width}x${config.adType.height}`
-                  }}</span>
+                }}</span>
               </div>
               <div class="ad-details">
                 <div class="ad-site">{{ config.site.name }}</div>
@@ -283,12 +283,44 @@ export default {
     };
 
     const startPicking = () => {
-      saveFormState();
+      // Save the current page and form state
+      const currentState = {
+        page: currentPage.value,
+        editAd: selectedAd.value ? { ...selectedAd.value } : null,
+        newAd: currentPage.value === Page.CreateConfig ? { ...newAd.value } : null
+      };
+
+      // Store current state in local storage
+      chrome.storage.local.set({ pickerState: currentState });
+
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id, {
-            action: 'startPicking'
-          }, (response) => {
+          // Set up listener for container selection
+          const messageHandler = (message) => {
+            if (message.type === 'containerConfirmed') {
+              // Retrieve saved state
+              chrome.storage.local.get(['pickerState'], (result) => {
+                if (result.pickerState) {
+                  // Store the container ID with the state
+                  const updatedState = {
+                    ...result.pickerState,
+                    selectedContainer: message.elementInfo.value
+                  };
+
+                  // Save the updated state
+                  chrome.storage.local.set({ pickerState: updatedState }, () => {
+                    // Now try to reopen
+                    chrome.runtime.sendMessage({ type: 'reopenExtension' });
+                  });
+                }
+              });
+            }
+          };
+
+          chrome.runtime.onMessage.addListener(messageHandler);
+
+          // Start the picker
+          chrome.tabs.sendMessage(tabs[0].id, { action: 'startPicking' }, (response) => {
             if (response && response.status === 'activated') {
               window.close();
             }
@@ -538,10 +570,44 @@ export default {
     }
 
     onMounted(() => {
-      loadSavedValues()
-      loadDemoMode()
-      restoreFormState()
-    })
+      loadSavedValues();
+      loadDemoMode();
+
+      // Check for saved picker state
+      chrome.storage.local.get(['pickerState'], (result) => {
+        if (result.pickerState) {
+          console.log('Found saved picker state:', result.pickerState);
+
+          // Restore page
+          if (result.pickerState.page) {
+            currentPage.value = result.pickerState.page;
+          }
+
+          // Restore form data
+          if (result.pickerState.editAd && currentPage.value === Page.EditConfig) {
+            selectedAd.value = result.pickerState.editAd;
+          }
+
+          if (result.pickerState.newAd && currentPage.value === Page.CreateConfig) {
+            newAd.value = result.pickerState.newAd;
+          }
+
+          // Apply selected container if available
+          if (result.pickerState.selectedContainer) {
+            console.log('Applying container:', result.pickerState.selectedContainer);
+
+            if (currentPage.value === Page.EditConfig && selectedAd.value) {
+              selectedAd.value.divId = result.pickerState.selectedContainer;
+            } else if (currentPage.value === Page.CreateConfig) {
+              newAd.value.divId = result.pickerState.selectedContainer;
+            }
+          }
+
+          // Clean up after applying
+          chrome.storage.local.remove('pickerState');
+        }
+      });
+    });
 
     return {
       networkId,

@@ -9,6 +9,125 @@ function formatContainerId(id) {
 
 debugLog('Picker script loaded');
 
+let isConfirmationMode = false;
+
+function resetPickerUI() {
+    // Reset state
+    isActive = false;
+    isConfirmationMode = false;
+    selectedElement = null;
+    lastHighlightedElement = null;
+    
+    // Reset UI
+    message.textContent = selectReadyMessage;
+    containerInfo.textContent = '\u00A0';
+    containerInfo.classList.remove('selected');
+    
+    // Reset button UI
+    const content = document.querySelector('.picking-content');
+    const buttonContainer = content.querySelector('.button-container');
+    if (buttonContainer) {
+      // Remove button container and add single cancel button
+      const cancelButton = document.createElement('button');
+      cancelButton.className = 'cancel-button';
+      cancelButton.textContent = 'Cancel';
+      
+      // Add click handler
+      cancelButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isActive = false;
+        infoDisplay.style.display = 'none';
+        resetPickerUI();
+        chrome.runtime.sendMessage({ type: 'pickingCanceled' });
+      });
+      
+      // Replace button container with plain cancel button
+      content.replaceChild(cancelButton, buttonContainer);
+    }
+    
+    // Hide display
+    infoDisplay.style.display = 'none';
+    
+    // Remove element highlights
+    document.querySelectorAll('.inspector-highlight, .inspector-selected').forEach(el => {
+      el.classList.remove('inspector-highlight');
+      el.classList.remove('inspector-selected');
+    });
+  }
+  
+
+function deactivatePicker() {
+    isActive = false;
+    isConfirmationMode = false;  // Reset confirmation mode
+
+    // Remove all highlights
+    if (lastHighlightedElement) {
+        lastHighlightedElement.classList.remove('inspector-highlight');
+    }
+    if (selectedElement) {
+        selectedElement.classList.remove('inspector-selected');
+    }
+
+    // Reset state
+    selectedElement = null;
+    lastHighlightedElement = null;
+
+    // Reset UI
+    message.textContent = selectReadyMessage;
+    containerInfo.textContent = '\u00A0';
+    containerInfo.classList.remove('selected');
+
+    // Remove button container if it exists
+    const content = document.querySelector('.picking-content');
+    const buttonContainer = content.querySelector('.button-container');
+    if (buttonContainer) {
+        const cancelButton = document.createElement('button');
+        cancelButton.className = 'cancel-button';
+        cancelButton.textContent = 'Cancel';
+        content.replaceChild(cancelButton, buttonContainer);
+
+        // Re-add cancel button click handler
+        cancelButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            chrome.runtime.sendMessage({ type: 'pickingCanceled' });
+            deactivatePicker();
+        });
+    }
+
+    infoDisplay.style.display = 'none';
+}
+
+function updateUIForConfirmation() {
+    // Change message
+    message.textContent = 'Confirm container selection?';
+    containerInfo.classList.add('selected');
+
+    // Find the picking-content div first
+    const content = document.querySelector('.picking-content');
+    if (!content) return;
+
+    // Create confirm button
+    const confirmButton = document.createElement('button');
+    confirmButton.className = 'confirm-button';
+    confirmButton.textContent = 'Confirm';
+
+    // Get existing cancel button
+    const existingCancelButton = content.querySelector('.cancel-button');
+    if (!existingCancelButton) return;
+
+    // Create button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'button-container';
+    buttonContainer.appendChild(confirmButton);
+    buttonContainer.appendChild(existingCancelButton);
+
+    // Replace the existing cancel button
+    content.appendChild(buttonContainer);
+
+}
+
 function initDisplayInfoElement(initialMessage) {
     const infoDisplay = document.createElement('div');
     infoDisplay.className = 'element-info-display';
@@ -144,16 +263,25 @@ document.addEventListener('click', function (event) {
         chrome.runtime.sendMessage({
             type: 'pickingCanceled'
         });
+        resetPickerUI();
         return;
     }
 
-    if (!selectedElement) {
-        selectedElement = targetElement;
-        selectedElement.classList.add('inspector-selected');
-        
-        const elementInfo = getElementInfo(selectedElement);
-        containerInfo.textContent = `Selected container: ${formatContainerId(elementInfo.value)}`;
-        containerInfo.classList.add('selected'); // Just add selected class
+    // Check if clicking the confirm button
+    if (targetElement.classList.contains('confirm-button')) {
+        debugLog('Confirm button clicked');
+        if (selectedElement) {
+            chrome.runtime.sendMessage({
+              type: 'containerConfirmed',
+              elementInfo: getElementInfo(selectedElement)
+            }, () => {
+              chrome.runtime.sendMessage({ type: 'reopenExtension' });
+              resetPickerUI();
+            });
+          } else {
+            resetPickerUI();
+          }
+          return;
     }
 
     // Check if clicking the info display
@@ -161,7 +289,22 @@ document.addEventListener('click', function (event) {
         return;
     }
 
-    // Handle element selection
+    // Handle first selection
+    if (!selectedElement) {
+        selectedElement = targetElement;
+        selectedElement.classList.add('inspector-selected');
+
+        const elementInfo = getElementInfo(selectedElement);
+        containerInfo.textContent = `Selected container: ${formatContainerId(elementInfo.value)}`;
+        containerInfo.classList.add('selected');
+
+        isConfirmationMode = true;
+        updateUIForConfirmation();
+        return;  // Add return here to prevent the code below from executing
+    }
+
+    // This part should only execute if we want to select a different element
+    selectedElement.classList.remove('inspector-selected'); // Remove old selection
     selectedElement = targetElement;
     selectedElement.classList.add('inspector-selected');
 
@@ -172,7 +315,7 @@ document.addEventListener('click', function (event) {
         type: 'elementSelected',
         elementInfo: elementInfo
     });
-}, true);
+});
 
 // Update mouseover to respect selection
 document.addEventListener('mouseover', function (event) {

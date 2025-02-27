@@ -23,7 +23,6 @@ The Ad Demo Manager Chrome Extension is designed to help ad operations teams and
 1. Clone this repository
 2. Install dependencies:
    ```
-   cd extension_ui/banner-manager-extension
    npm install
    ```
 3. Build the extension:
@@ -106,23 +105,22 @@ When a URL contains a category parameter (e.g., `?category=electronics`), the ex
 ### Project Structure
 
 ```
-extension_ui/
-├── banner-manager-extension/       # Main extension code
-│   ├── public/                     # Static assets
-│   │   ├── background.js           # Background service worker
-│   │   ├── content.js              # Content script for ad injection
-│   │   ├── manifest.json           # Extension manifest
-│   │   ├── picker.js               # Element picker script
-│   │   └── styles.css              # Global styles
-│   ├── src/                        # Vue application
-│   │   ├── components/             # Vue components
-│   │   ├── App.vue                 # Main application component
-│   │   ├── main.ts                 # Application entry point
-│   │   └── types/                  # TypeScript type definitions
-│   ├── scripts/                    # Build scripts
-│   ├── popup.html                  # Popup HTML template
-│   └── package.json                # Dependencies and scripts
-└── styles.css                      # Extension styles
+/                              # Root directory
+├── public/                    # Static assets
+│   ├── background.js          # Background service worker
+│   ├── content.js             # Content script for ad injection
+│   ├── manifest.json          # Extension manifest
+│   ├── picker.js              # Element picker script
+│   └── styles.css             # Global styles
+├── src/                       # Vue application
+│   ├── components/            # Vue components
+│   ├── App.vue                # Main application component
+│   ├── main.ts                # Application entry point
+│   └── types/                 # TypeScript type definitions
+├── scripts/                   # Build scripts
+├── popup.html                 # Popup HTML template
+├── package.json               # Dependencies and scripts
+└── styles.css                 # Extension styles
 ```
 
 ### Build Process

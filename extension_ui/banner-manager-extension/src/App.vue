@@ -48,7 +48,7 @@
                 <span class="ad-name">{{ config.name }}</span>
                 <span class="ad-type-badge">{{ `${config.adType.name} -
                   ${config.adType.width}x${config.adType.height}`
-                }}</span>
+                  }}</span>
               </div>
               <div class="ad-details">
                 <div class="ad-site">{{ config.site.name }}</div>
@@ -283,46 +283,30 @@ export default {
     };
 
     const startPicking = () => {
-      // Save the current page and form state
+      // Save the current page and form state with more detailed info
       const currentState = {
         page: currentPage.value,
-        editAd: selectedAd.value ? { ...selectedAd.value } : null,
-        newAd: currentPage.value === Page.CreateConfig ? { ...newAd.value } : null
+        editAd: selectedAd.value ? JSON.parse(JSON.stringify(selectedAd.value)) : null,
+        newAd: currentPage.value === Page.CreateConfig ? JSON.parse(JSON.stringify(newAd.value)) : null
       };
 
+      // Log the state we're saving
+      console.log('Saving picker state:', currentState);
+
       // Store current state in local storage
-      chrome.storage.local.set({ pickerState: currentState });
+      chrome.storage.local.set({ pickerState: currentState }, () => {
+        console.log('Picker state saved to storage');
+      });
 
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
-          // Set up listener for container selection
-          const messageHandler = (message) => {
-            if (message.type === 'containerConfirmed') {
-              // Retrieve saved state
-              chrome.storage.local.get(['pickerState'], (result) => {
-                if (result.pickerState) {
-                  // Store the container ID with the state
-                  const updatedState = {
-                    ...result.pickerState,
-                    selectedContainer: message.elementInfo.value
-                  };
-
-                  // Save the updated state
-                  chrome.storage.local.set({ pickerState: updatedState }, () => {
-                    // Now try to reopen
-                    chrome.runtime.sendMessage({ type: 'reopenExtension' });
-                  });
-                }
-              });
-            }
-          };
-
-          chrome.runtime.onMessage.addListener(messageHandler);
-
-          // Start the picker
+          // Send message to activate picker
           chrome.tabs.sendMessage(tabs[0].id, { action: 'startPicking' }, (response) => {
             if (response && response.status === 'activated') {
+              console.log('Picker activated, closing popup');
               window.close();
+            } else {
+              console.error('Failed to activate picker');
             }
           });
         }
@@ -570,42 +554,51 @@ export default {
     }
 
     onMounted(() => {
-      loadSavedValues();
-      loadDemoMode();
+      // Before doing any other loading, check for direct container value
+      chrome.storage.local.get(['directContainerValue', 'directContainerTimestamp', 'pickerState'], (result) => {
+        console.log('[App] Found on mount:', result);
 
-      // Check for saved picker state
-      chrome.storage.local.get(['pickerState'], (result) => {
-        if (result.pickerState) {
-          console.log('Found saved picker state:', result.pickerState);
+        // If we have a direct container value that's fresh (less than 5 seconds old)
+        if (result.directContainerValue && result.directContainerTimestamp) {
+          const ageInMs = Date.now() - result.directContainerTimestamp;
+          if (ageInMs < 5000) { // Only use if less than 5 seconds old
+            console.log('[App] Found fresh direct container value:', result.directContainerValue);
 
-          // Restore page
-          if (result.pickerState.page) {
-            currentPage.value = result.pickerState.page;
-          }
+            // We need to restore the page first from pickerState
+            if (result.pickerState && result.pickerState.page) {
+              console.log('[App] Restoring page from picker state:', result.pickerState.page);
+              currentPage.value = result.pickerState.page;
 
-          // Restore form data
-          if (result.pickerState.editAd && currentPage.value === Page.EditConfig) {
-            selectedAd.value = result.pickerState.editAd;
-          }
+              // Then restore the appropriate form data
+              if (result.pickerState.page === Page.EditConfig && result.pickerState.editAd) {
+                selectedAd.value = result.pickerState.editAd;
+                console.log('[App] Restored edit ad');
 
-          if (result.pickerState.newAd && currentPage.value === Page.CreateConfig) {
-            newAd.value = result.pickerState.newAd;
-          }
+                // Finally apply the container value
+                if (selectedAd.value) {
+                  selectedAd.value.divId = result.directContainerValue;
+                  console.log('[App] Applied container to edit ad:', result.directContainerValue);
+                }
+              } else if (result.pickerState.page === Page.CreateConfig && result.pickerState.newAd) {
+                newAd.value = result.pickerState.newAd;
+                console.log('[App] Restored new ad');
 
-          // Apply selected container if available
-          if (result.pickerState.selectedContainer) {
-            console.log('Applying container:', result.pickerState.selectedContainer);
-
-            if (currentPage.value === Page.EditConfig && selectedAd.value) {
-              selectedAd.value.divId = result.pickerState.selectedContainer;
-            } else if (currentPage.value === Page.CreateConfig) {
-              newAd.value.divId = result.pickerState.selectedContainer;
+                // Apply container value
+                newAd.value.divId = result.directContainerValue;
+                console.log('[App] Applied container to new ad:', result.directContainerValue);
+              }
             }
-          }
 
-          // Clean up after applying
-          chrome.storage.local.remove('pickerState');
+            // Clean up storage
+            chrome.storage.local.remove(['directContainerValue', 'directContainerTimestamp']);
+          } else {
+            console.log('[App] Direct container value too old, not using');
+          }
         }
+
+        // Continue with normal loading
+        loadSavedValues();
+        loadDemoMode();
       });
     });
 

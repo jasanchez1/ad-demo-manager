@@ -17,45 +17,45 @@ function resetPickerUI() {
     isConfirmationMode = false;
     selectedElement = null;
     lastHighlightedElement = null;
-    
+
     // Reset UI
     message.textContent = selectReadyMessage;
     containerInfo.textContent = '\u00A0';
     containerInfo.classList.remove('selected');
-    
+
     // Reset button UI
     const content = document.querySelector('.picking-content');
     const buttonContainer = content.querySelector('.button-container');
     if (buttonContainer) {
-      // Remove button container and add single cancel button
-      const cancelButton = document.createElement('button');
-      cancelButton.className = 'cancel-button';
-      cancelButton.textContent = 'Cancel';
-      
-      // Add click handler
-      cancelButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        isActive = false;
-        infoDisplay.style.display = 'none';
-        resetPickerUI();
-        chrome.runtime.sendMessage({ type: 'pickingCanceled' });
-      });
-      
-      // Replace button container with plain cancel button
-      content.replaceChild(cancelButton, buttonContainer);
+        // Remove button container and add single cancel button
+        const cancelButton = document.createElement('button');
+        cancelButton.className = 'cancel-button';
+        cancelButton.textContent = 'Cancel';
+
+        // Add click handler
+        cancelButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            isActive = false;
+            infoDisplay.style.display = 'none';
+            resetPickerUI();
+            chrome.runtime.sendMessage({ type: 'pickingCanceled' });
+        });
+
+        // Replace button container with plain cancel button
+        content.replaceChild(cancelButton, buttonContainer);
     }
-    
+
     // Hide display
     infoDisplay.style.display = 'none';
-    
+
     // Remove element highlights
     document.querySelectorAll('.inspector-highlight, .inspector-selected').forEach(el => {
-      el.classList.remove('inspector-highlight');
-      el.classList.remove('inspector-selected');
+        el.classList.remove('inspector-highlight');
+        el.classList.remove('inspector-selected');
     });
-  }
-  
+}
+
 
 function deactivatePicker() {
     isActive = false;
@@ -113,19 +113,62 @@ function updateUIForConfirmation() {
     confirmButton.className = 'confirm-button';
     confirmButton.textContent = 'Confirm';
 
-    // Get existing cancel button
+    // Create a new cancel button (to ensure proper event handling)
+    const newCancelButton = document.createElement('button');
+    newCancelButton.className = 'cancel-button';
+    newCancelButton.textContent = 'Cancel';
+
+    // Get existing cancel button and remove it
     const existingCancelButton = content.querySelector('.cancel-button');
-    if (!existingCancelButton) return;
+    if (existingCancelButton) {
+        existingCancelButton.remove();
+    }
 
     // Create button container
     const buttonContainer = document.createElement('div');
     buttonContainer.className = 'button-container';
     buttonContainer.appendChild(confirmButton);
-    buttonContainer.appendChild(existingCancelButton);
+    buttonContainer.appendChild(newCancelButton);
 
-    // Replace the existing cancel button
+    // Add event listeners to new buttons
+    confirmButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (selectedElement) {
+            const elementInfo = getElementInfo(selectedElement);
+            console.log('[Element Picker] Confirming selection:', elementInfo.value);
+
+            // Save directly to local storage first - this is the most important part
+            chrome.storage.local.set({
+                directContainerValue: elementInfo.value,
+                directContainerTimestamp: Date.now() // Add timestamp for freshness check
+            }, () => {
+                console.log('[Element Picker] Container value saved directly');
+
+                // Then send message to background script to handle reopening
+                chrome.runtime.sendMessage({
+                    type: 'containerConfirmedReopenNow',
+                    elementInfo: elementInfo
+                });
+
+                // Clean up UI
+                resetPickerUI();
+            });
+        }
+    });
+
+    newCancelButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isActive = false;
+        infoDisplay.style.display = 'none';
+        resetPickerUI();
+        chrome.runtime.sendMessage({ type: 'pickingCanceled' });
+    });
+
+    // Replace the existing content with new button container
     content.appendChild(buttonContainer);
-
 }
 
 function initDisplayInfoElement(initialMessage) {
@@ -272,16 +315,16 @@ document.addEventListener('click', function (event) {
         debugLog('Confirm button clicked');
         if (selectedElement) {
             chrome.runtime.sendMessage({
-              type: 'containerConfirmed',
-              elementInfo: getElementInfo(selectedElement)
+                type: 'containerConfirmed',
+                elementInfo: getElementInfo(selectedElement)
             }, () => {
-              chrome.runtime.sendMessage({ type: 'reopenExtension' });
-              resetPickerUI();
+                chrome.runtime.sendMessage({ type: 'reopenExtension' });
+                resetPickerUI();
             });
-          } else {
+        } else {
             resetPickerUI();
-          }
-          return;
+        }
+        return;
     }
 
     // Check if clicking the info display

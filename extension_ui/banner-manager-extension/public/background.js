@@ -1,6 +1,7 @@
 const MANAGEMENT_URL = "https://api.kevel.co/v1"
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('[Background] Message received:', request);
 
   if (request.type === 'site' || request.type === 'adtypes') {
     fetch(`${MANAGEMENT_URL}/${request.type}`, {
@@ -53,7 +54,54 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'reopenExtension') {
-    chrome.action.openPopup();
+    console.log('[Background] Reopening extension popup');
+
+    // Ensure the popup doesn't open too quickly
+    setTimeout(() => {
+      chrome.action.openPopup(() => {
+        if (chrome.runtime.lastError) {
+          console.error('[Background] Error reopening popup:', chrome.runtime.lastError);
+
+          // If direct popup fails, try again with a longer delay
+          setTimeout(() => {
+            chrome.action.openPopup();
+          }, 500);
+        }
+      });
+    }, 500); // Longer delay to ensure storage operations complete
   }
 
+  // Handle containerConfirmed in background to ensure it works even if popup is closed
+  if (request.type === 'containerConfirmedReopenNow') {
+    console.log('[Background] Container confirmed with direct reopen:', request.elementInfo);
+
+    // Save to local storage as backup
+    chrome.storage.local.set({
+      directContainerValue: request.elementInfo.value,
+      directContainerTimestamp: Date.now()
+    }, () => {
+      console.log('[Background] Container value saved from background');
+
+      // Wait a moment to ensure storage is complete
+      setTimeout(() => {
+        try {
+          chrome.action.openPopup(() => {
+            if (chrome.runtime.lastError) {
+              console.error('[Background] Error reopening popup:', chrome.runtime.lastError);
+            } else {
+              console.log('[Background] Popup reopened via direct method');
+            }
+          });
+        } catch (error) {
+          console.error('[Background] Exception reopening popup:', error);
+        }
+      }, 300);
+    });
+
+    // Acknowledge receipt
+    if (sendResponse) {
+      sendResponse({ success: true });
+    }
+    return true; // Keep channel open for async response
+  }
 });

@@ -52,15 +52,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
   }
 
-  if (request.type === 'startPicking' || request.type === 'endPicking') {
-    chrome.tabs.sendMessage(
-      request.tabId,
-      { action: 'toggleExtension' },
-      (response) => {
-        sendResponse(response);
-      }
-    );
-    return true;
+  if (request.type === 'reopenExtension') {
+    chrome.action.openPopup();
   }
 
 });

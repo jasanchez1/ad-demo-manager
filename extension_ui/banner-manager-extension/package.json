@@ -6,7 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "vite",
     "generate-icons": "node scripts/generate-icons.js",
-    "build": "vite build && npm run generate-icons && cp public/manifest.json dist/ && cp public/background.js dist/ && cp public/content.js dist/ && cp public/elementPicker.js dist/ && cp public/styles.css dist/",
+    "build": "vite build && npm run generate-icons && cp public/manifest.json dist/ && cp public/background.js dist/ && cp public/content.js dist/ && cp public/styles.css dist/ && cp public/picker.js dist/",
     "preview": "vite preview",
     "clean": "rm -rf dist node_modules package-lock.json"
   },

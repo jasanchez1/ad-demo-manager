@@ -1,97 +1,82 @@
 <template>
   <div class="app-container" :class="{ 'picking-mode': isPicking }">
-    <div v-if="isPicking" class="picking-header">
-      <div class="picking-content">
-        <img src="/icon.jpg" alt="Banner Manager Icon" class="header-icon" />
-        <div class="picking-text-container">
-          <span class="picking-instruction">Select where you want to place your ad</span>
-          <span class="picking-container-id">
-            {{ currentContainer ? `Container ID: ${formatContainerId(currentContainer)}` : '\u00A0' }}
-          </span>
-        </div>
-        <button class="cancel-pick" @click="cancelPicking">Cancel</button>
+    <div class="header">
+      <img src="/icon.jpg" alt="Banner Manager Icon" class="header-icon" />
+      <h1 class="title">Ad Demo Manager</h1>
+      <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey" @click="navigateTo(Page.Settings)">
+        <div class="saved-item">Network ID: {{ savedValues.networkId }}</div>
+        <div class="saved-item">API Key: **********</div>
       </div>
     </div>
-
-    <div v-else>
-      <div class="header">
-        <img src="/icon.jpg" alt="Banner Manager Icon" class="header-icon" />
-        <h1 class="title">Ad Demo Manager</h1>
-        <div class="saved-values" v-if="savedValues.networkId && savedValues.apiKey" @click="navigateTo(Page.Settings)">
-          <div class="saved-item">Network ID: {{ savedValues.networkId }}</div>
-          <div class="saved-item">API Key: **********</div>
+    <div class="content">
+      <div class="settings" v-if="currentPage === Page.Settings">
+        <h3 class="title">Network Settings</h3>
+        <h5 class="menu-description">Before continuing, you need to set configure your network settings</h5>
+        <div class="form">
+          <div class="input-group">
+            <label>Network ID</label>
+            <input type="text" v-model="networkId" placeholder='Enter Network'>
+          </div>
+          <div class="input-group">
+            <label>API Key</label>
+            <input type="text" v-model="apiKey" placeholder='Enter API Key'>
+          </div>
+          <div class="actions">
+            <button v-if="savedValues.networkId && savedValues.apiKey" class="secondary"
+              @click="navigateBack">Cancel</button>
+            <button @click="saveSettings" :disabled="isLoading"> {{ isLoading ? 'Saving...' : 'Save' }} </button>
+          </div>
+          <div class="input-group">
+            <label class="toggle-label">
+              Demo Mode
+              <div class="toggle-wrapper">
+                <label class="toggle" @click.stop>
+                  <input type="checkbox" v-model="demoMode" @change="saveDemoMode">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </label>
+          </div>
         </div>
       </div>
-      <div class="content">
-        <div class="settings" v-if="currentPage === Page.Settings">
-          <h3 class="title">Network Settings</h3>
-          <h5 class="menu-description">Before continuing, you need to set configure your network settings</h5>
-          <div class="form">
-            <div class="input-group">
-              <label>Network ID</label>
-              <input type="text" v-model="networkId" placeholder='Enter Network'>
+      <div v-if="currentPage === Page.AdConfigs">
+        <h3 class="title">Ad Configurations</h3>
+        <div class="ad-list">
+          <div v-for="config in adConfigs" :key="config.id" class="ad-item" @click="openAdDetails(config)">
+            <div class="ad-info">
+              <div class="ad-header">
+                <span class="ad-name">{{ config.name }}</span>
+                <span class="ad-type-badge">{{ `${config.adType.name} -
+                  ${config.adType.width}x${config.adType.height}`
+                }}</span>
+              </div>
+              <div class="ad-details">
+                <div class="ad-site">{{ config.site.name }}</div>
+                <div class="ad-url">{{ config.url }}</div>
+              </div>
             </div>
-            <div class="input-group">
-              <label>API Key</label>
-              <input type="text" v-model="apiKey" placeholder='Enter API Key'>
-            </div>
-            <div class="actions">
-              <button v-if="savedValues.networkId && savedValues.apiKey" class="secondary"
-                @click="navigateBack">Cancel</button>
-              <button @click="saveSettings" :disabled="isLoading"> {{ isLoading ? 'Saving...' : 'Save' }} </button>
-            </div>
-            <div class="input-group">
-              <label class="toggle-label">
-                Demo Mode
-                <div class="toggle-wrapper">
-                  <label class="toggle" @click.stop>
-                    <input type="checkbox" v-model="demoMode" @change="saveDemoMode">
-                    <span class="slider"></span>
-                  </label>
-                </div>
+            <div class="ad-config-actions">
+              <label class="toggle" @click.stop>
+                <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
+                <span class="slider"></span>
+              </label>
+              <label class="delete" @click.stop="deleteAdConfig(config.id)">
+                <span class="delete-icon">×</span>
               </label>
             </div>
           </div>
         </div>
-        <div v-if="currentPage === Page.AdConfigs">
-          <h3 class="title">Ad Configurations</h3>
-          <div class="ad-list">
-            <div v-for="config in adConfigs" :key="config.id" class="ad-item" @click="openAdDetails(config)">
-              <div class="ad-info">
-                <div class="ad-header">
-                  <span class="ad-name">{{ config.name }}</span>
-                  <span class="ad-type-badge">{{ `${config.adType.name} -
-                    ${config.adType.width}x${config.adType.height}`
-                    }}</span>
-                </div>
-                <div class="ad-details">
-                  <div class="ad-site">{{ config.site.name }}</div>
-                  <div class="ad-url">{{ config.url }}</div>
-                </div>
-              </div>
-              <div class="ad-config-actions">
-                <label class="toggle" @click.stop>
-                  <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
-                  <span class="slider"></span>
-                </label>
-                <label class="delete" @click.stop="deleteAdConfig(config.id)">
-                  <span class="delete-icon">×</span>
-                </label>
-              </div>
-            </div>
-          </div>
-          <button class="create-button" @click="createNewAd">Create New Ad Config</button>
-        </div>
+        <button class="create-button" @click="createNewAd">Create New Ad Config</button>
+      </div>
 
-        <AdForm v-if="currentPage === Page.EditConfig && selectedAd" :ad-data="selectedAd" :ad-types="adTypes"
-          :sites="sites" :is-edit="true" @start-picking="startPicking" @save="saveAdDetails" @cancel="closeAdDetails" />
+      <AdForm v-if="currentPage === Page.EditConfig && selectedAd" :ad-data="selectedAd" :ad-types="adTypes"
+        :sites="sites" :is-edit="true" @start-picking="startPicking" @save="saveAdDetails" @cancel="closeAdDetails" />
 
-        <AdForm v-if="currentPage === Page.CreateConfig" :ad-data="newAd" :ad-types="adTypes" :sites="sites"
-          :is-edit="false" @start-picking="startPicking" @save="saveNewAd" @cancel="cancelCreateAd" />
+      <AdForm v-if="currentPage === Page.CreateConfig" :ad-data="newAd" :ad-types="adTypes" :sites="sites"
+        :is-edit="false" @start-picking="startPicking" @save="saveNewAd" @cancel="cancelCreateAd" />
 
-        <div v-if="message" :class="['message', messageType]">
-          {{ message }}
-        </div>
+      <div v-if="message" :class="['message', messageType]">
+        {{ message }}
       </div>
     </div>
   </div>
@@ -102,6 +87,13 @@ import { Ref, ref, onMounted, watch } from '@vue/runtime-core'
 import { AdForm } from './components/AdForm'
 import type { Site, AdType, AdConfig, KevelAPIResponse, SiteResponse, AdTypeResponse } from '../src/types'
 
+interface SavedFormState {
+  page: Page;
+  formData: {
+    selectedAd: AdConfig | null;
+    newAd: AdConfig | null;
+  };
+}
 
 class KevelApiError extends Error {
   status: number;
@@ -198,10 +190,10 @@ interface Setup {
   closeAdDetails: () => void;
   deleteAdConfig: (id: number) => void;
   saveDemoMode: () => void;
-  formatContainerId: (id: string) => string;
   cancelPicking: () => void;
   startPicking: () => void;
-  currentContainer: Ref<string>;
+  saveFormState: () => void;
+  restoreFormState: () => void;
   isPicking: Ref<boolean>;
   networkId: Ref<string>;
   apiKey: Ref<string>;
@@ -252,20 +244,6 @@ export default {
     const adConfigs = ref<AdConfig[]>([])
     const newAd = ref<AdConfig>(getEmptyNewAd())
     const selectedAd = ref<AdConfig | null>(null)
-    const currentContainer = ref('')
-
-    chrome.runtime.onMessage.addListener((message) => {
-      if (message.type === 'containerHover') {
-        if (message.elementInfo.type === 'id') {
-          currentContainer.value = message.elementInfo.value;
-        } else if (message.elementInfo.type === 'class name') {
-          currentContainer.value = `${message.elementInfo.value}`;
-        }
-        else {
-          currentContainer.value = '';
-        }
-      }
-    });
 
     const navigateTo = (page: Page) => {
       lastPage.value = currentPage.value;
@@ -287,42 +265,91 @@ export default {
       navigateTo(Page.AdConfigs);
     }
 
+    const saveFormState = () => {
+      const state: SavedFormState = {
+        page: currentPage.value,
+        formData: {
+          selectedAd: selectedAd.value ? { ...selectedAd.value } : null,
+          newAd: currentPage.value === Page.CreateConfig ? { ...newAd.value } : null
+        }
+      };
+
+      // Save to chrome.storage
+      chrome.storage.local.set({ savedFormState: state }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('Error saving form state:', chrome.runtime.lastError);
+        }
+      });
+    };
 
     const startPicking = () => {
-      isPicking.value = true;  // Make sure we set this first
+      // Save the current page and form state
+      const currentState = {
+        page: currentPage.value,
+        editAd: selectedAd.value ? { ...selectedAd.value } : null,
+        newAd: currentPage.value === Page.CreateConfig ? { ...newAd.value } : null
+      };
+
+      // Store current state in local storage
+      chrome.storage.local.set({ pickerState: currentState });
 
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id) {
-          const elementSelectionHandler = (message: any, sender: any, sendResponse: any) => {
-            console.log('Message received:', message); // Debug log
-            if (message.type === 'elementSelected') {
-              if (currentPage.value === Page.EditConfig && selectedAd.value) {
-                selectedAd.value.divId = message.elementInfo.value;
-              } else if (currentPage.value === Page.CreateConfig) {
-                newAd.value.divId = message.elementInfo.value;
-              }
-              chrome.runtime.onMessage.removeListener(elementSelectionHandler);
-              chrome.tabs.sendMessage(tabs[0].id!, { action: 'toggleExtension' });
-              isPicking.value = false;
+          // Set up listener for container selection
+          const messageHandler = (message) => {
+            if (message.type === 'containerConfirmed') {
+              // Retrieve saved state
+              chrome.storage.local.get(['pickerState'], (result) => {
+                if (result.pickerState) {
+                  // Store the container ID with the state
+                  const updatedState = {
+                    ...result.pickerState,
+                    selectedContainer: message.elementInfo.value
+                  };
+
+                  // Save the updated state
+                  chrome.storage.local.set({ pickerState: updatedState }, () => {
+                    // Now try to reopen
+                    chrome.runtime.sendMessage({ type: 'reopenExtension' });
+                  });
+                }
+              });
             }
           };
 
-          chrome.runtime.onMessage.addListener(elementSelectionHandler);
+          chrome.runtime.onMessage.addListener(messageHandler);
 
-          chrome.tabs.sendMessage(tabs[0].id!, { action: 'toggleExtension' }, (response) => {
-            console.log('Toggle response:', response); // Debug log
-            if (chrome.runtime.lastError) {
-              console.error('Error:', chrome.runtime.lastError);
+          // Start the picker
+          chrome.tabs.sendMessage(tabs[0].id, { action: 'startPicking' }, (response) => {
+            if (response && response.status === 'activated') {
+              window.close();
             }
           });
         }
       });
-    }
+    };
 
-    onMounted(() => {
-      loadSavedValues()
-      document.documentElement.setAttribute('data-picking', isPicking.value.toString());
-    })
+    const restoreFormState = () => {
+      chrome.storage.local.get(['savedFormState'], (result) => {
+        if (result.savedFormState) {
+          const state = result.savedFormState as SavedFormState;
+
+          // Restore page
+          currentPage.value = state.page;
+
+          // Restore form data
+          if (state.formData.selectedAd) {
+            selectedAd.value = state.formData.selectedAd;
+          }
+          if (state.formData.newAd && state.page === Page.CreateConfig) {
+            newAd.value = state.formData.newAd;
+          }
+
+          // Clear saved state after restoring
+          chrome.storage.local.remove(['savedFormState']);
+        }
+      });
+    };
 
     watch(() => isPicking.value, (newValue: boolean) => {
       document.documentElement.setAttribute('data-picking', newValue.toString());
@@ -345,10 +372,6 @@ export default {
           message: 'Error communicating with the Kevel API'
         }
       }
-    }
-
-    const formatContainerId = (id: string) => {
-      return id.length > 20 ? id.slice(0, 20) + '...' : id;
     }
 
     // Validation function
@@ -544,17 +567,47 @@ export default {
 
     const cancelPicking = () => {
       isPicking.value = false;
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.sendMessage(tabs[0].id!, { action: 'toggleExtension' });
-        }
-      });
     }
 
     onMounted(() => {
-      loadSavedValues()
-      loadDemoMode()
-    })
+      loadSavedValues();
+      loadDemoMode();
+
+      // Check for saved picker state
+      chrome.storage.local.get(['pickerState'], (result) => {
+        if (result.pickerState) {
+          console.log('Found saved picker state:', result.pickerState);
+
+          // Restore page
+          if (result.pickerState.page) {
+            currentPage.value = result.pickerState.page;
+          }
+
+          // Restore form data
+          if (result.pickerState.editAd && currentPage.value === Page.EditConfig) {
+            selectedAd.value = result.pickerState.editAd;
+          }
+
+          if (result.pickerState.newAd && currentPage.value === Page.CreateConfig) {
+            newAd.value = result.pickerState.newAd;
+          }
+
+          // Apply selected container if available
+          if (result.pickerState.selectedContainer) {
+            console.log('Applying container:', result.pickerState.selectedContainer);
+
+            if (currentPage.value === Page.EditConfig && selectedAd.value) {
+              selectedAd.value.divId = result.pickerState.selectedContainer;
+            } else if (currentPage.value === Page.CreateConfig) {
+              newAd.value.divId = result.pickerState.selectedContainer;
+            }
+          }
+
+          // Clean up after applying
+          chrome.storage.local.remove('pickerState');
+        }
+      });
+    });
 
     return {
       networkId,
@@ -584,10 +637,10 @@ export default {
       demoMode,
       saveDemoMode,
       isPicking,
-      currentContainer,
-      formatContainerId,
       cancelPicking,
-      startPicking
+      startPicking,
+      saveFormState,
+      restoreFormState
     }
   }
 }
@@ -950,60 +1003,5 @@ button:disabled {
 .toggle-wrapper {
   display: flex;
   align-items: center;
-}
-
-.app-container.picking-mode {
-  height: auto;
-  min-height: auto;
-}
-
-.picking-header {
-  display: flex;
-  align-items: center;
-  padding: 12px;
-  background: #001830;
-  border-bottom: 1px solid #3182ce;
-}
-
-.picking-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.picking-text {
-  color: white;
-  font-size: 12px;
-}
-
-.picking-text-container {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 42px;
-}
-
-.picking-instruction {
-  color: white;
-  font-size: 12px;
-}
-
-.picking-container-id {
-  color: #3182ce;
-  font-size: 11px;
-  font-weight: 500;
-  min-height: 14px;
-}
-
-.cancel-pick {
-  margin-left: auto;
-  width: auto !important;
-  background: transparent;
-  border: 1px solid #fd563c;
-  color: #fd563c;
-  padding: 4px 12px;
-  height: 24px;
-  font-size: 12px;
 }
 </style>

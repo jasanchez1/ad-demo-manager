@@ -66,7 +66,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     return true; // Keep message channel open for async response
   }
-  
+
   if (request.type === 'demoToggled') {
     chrome.tabs.query({}, (tabs) => {
       tabs.forEach(tab => {
@@ -127,5 +127,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
     }
     return true; // Keep channel open for async response
+  }
+
+  if (request.type === 'handleImport') {
+    console.log('[Background] Handling import request');
+    
+    // Get the config from the request
+    const importedConfig = request.config;
+    
+    // Store it in local storage temporarily
+    chrome.storage.local.set({
+      importedConfig: importedConfig,
+      importTimestamp: Date.now()
+    }, () => {
+      console.log('[Background] Imported config saved');
+      
+      if (sendResponse) {
+        sendResponse({ success: true });
+      }
+    });
+    
+    return true; // Keep message channel open for async response
   }
 });

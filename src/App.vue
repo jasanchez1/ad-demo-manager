@@ -60,13 +60,17 @@
                 <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
                 <span class="slider"></span>
               </label>
-              <label class="delete" @click.stop="deleteAdConfig(config.id)">
-                <span class="delete-icon">×</span>
-              </label>
+              <AdItemMenu @edit="openAdDetails(config)" @export="exportAdAsJson(config)"
+                @delete="deleteAdConfig(config.id)" @click.stop />
             </div>
           </div>
         </div>
-        <button class="create-button" @click="createNewAd">Create New Ad Config</button>
+        <div class="action-buttons">
+          <button class="create-button" @click="createNewAd">Create New Ad</button>
+          <button class="import-button" @click="openImportFile">Import Ad</button>
+
+          <input type="file" ref="fileInput" @change="handleFileSelect" accept=".json" style="display: none" />
+        </div>
       </div>
 
       <AdForm v-if="currentPage === Page.EditConfig && selectedAd" :ad-data="selectedAd" :ad-types="adTypes"
@@ -85,6 +89,8 @@
 <script lang="ts">
 import { Ref, ref, onMounted, watch } from '@vue/runtime-core'
 import { AdForm } from './components/AdForm'
+import { AdItemMenu } from './components/AdItemMenu'
+import { ImportFromFile } from './components/ImportFromFile'
 import type { Site, AdType, AdConfig, KevelAPIResponse, SiteResponse, AdTypeResponse } from '../src/types'
 
 interface SavedFormState {
@@ -194,6 +200,13 @@ interface Setup {
   startPicking: () => void;
   saveFormState: () => void;
   restoreFormState: () => void;
+  exportAdAsJson: (config: AdConfig) => void;
+  openImportDialog: () => void;
+  handleImportedConfig: (config: any) => void;
+  openImportFile: () => void;
+  handleFileSelect: (event: Event) => void;
+  fileInput: Ref<HTMLInputElement | null>;
+  importFileRef: Ref<{ openFileDialog: () => void } | null>;
   isPicking: Ref<boolean>;
   networkId: Ref<string>;
   apiKey: Ref<string>;
@@ -227,13 +240,16 @@ const getEmptyNewAd = (): AdConfig => ({
 
 export default {
   components: {
-    AdForm
+    AdForm,
+    AdItemMenu,
+    ImportFromFile
   },
   setup(): Setup {
     const networkId = ref('')
     const apiKey = ref('')
     const message = ref('')
     const messageType = ref('')
+    const fileInput = ref<HTMLInputElement | null>(null);
     const isPicking = ref(false)
     const savedValues = ref({ networkId: '', apiKey: '' })
     const currentPage = ref<Page>(Page.AdConfigs)
@@ -411,6 +427,146 @@ export default {
       navigateTo(Page.CreateConfig)
     }
 
+    const exportAdAsJson = (config: AdConfig) => {
+      try {
+        // Create a clone of the config to export
+        const configToExport = { ...config }
+
+        // Convert to JSON string
+        const jsonString = JSON.stringify(configToExport, null, 2)
+
+        // Create blob and trigger download
+        const blob = new Blob([jsonString], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${config.name.replace(/\s+/g, '-').toLowerCase()}.json`
+        document.body.appendChild(a)
+        a.click()
+
+        // Cleanup
+        setTimeout(() => {
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+        }, 100)
+
+        message.value = 'Ad configuration exported successfully'
+        messageType.value = 'success'
+
+        setTimeout(() => {
+          message.value = ''
+        }, 3000)
+      } catch (error) {
+        console.error('Export error:', error)
+        message.value = 'Error exporting ad configuration'
+        messageType.value = 'error'
+
+        setTimeout(() => {
+          message.value = ''
+        }, 3000)
+      }
+    }
+
+    const openImportFile = () => {
+      // Reset the input to ensure the change event fires even if the same file is selected
+      if (fileInput.value) {
+        fileInput.value.value = '';
+        fileInput.value.click();
+      }
+    }
+
+    const handleFileSelect = (event: Event) => {
+      const input = event.target as HTMLInputElement;
+      const file = input.files?.[0];
+
+      if (!file) {
+        message.value = 'No file selected';
+        messageType.value = 'error';
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string;
+          const importedConfig = JSON.parse(content);
+
+          // Get config from array if needed
+          const config = Array.isArray(importedConfig) ? importedConfig[0] : importedConfig;
+
+          // Basic validation
+          if (!config || !config.name || !config.adType || !config.site || !config.url || !config.divId) {
+            message.value = 'Invalid configuration format';
+            messageType.value = 'error';
+            return;
+          }
+
+          // Generate new ID
+          const newId = Math.max(0, ...adConfigs.value.map((ad: AdConfig) => ad.id)) + 1;
+
+          // Find or fallback to default ad type
+          let adType = adTypes.value.find(t =>
+            t.name === config.adType.name &&
+            t.width === config.adType.width &&
+            t.height === config.adType.height
+          );
+
+          if (!adType && adTypes.value.length > 0) {
+            adType = adTypes.value[0];
+          }
+
+          // Find or fallback to default site
+          let site = sites.value.find(s => s.name === config.site.name);
+          if (!site && sites.value.length > 0) {
+            site = sites.value[0];
+          }
+
+          // Require valid type and site
+          if (!adType || !site) {
+            message.value = 'Could not match ad type or site. Please configure network settings first.';
+            messageType.value = 'error';
+            return;
+          }
+
+          // Create final config
+          const finalConfig: AdConfig = {
+            id: newId,
+            name: config.name,
+            adType: adType,
+            site: site,
+            url: config.url,
+            divId: config.divId,
+            isActive: config.isActive ?? true,
+            keywordQueryParam: config.keywordQueryParam || ''
+          };
+
+          // Add to configs and save
+          adConfigs.value.push(finalConfig);
+          saveAdConfigsToStorage();
+
+          message.value = 'Ad configuration imported successfully';
+          messageType.value = 'success';
+        } catch (error) {
+          console.error('Import error:', error);
+          message.value = 'Error parsing JSON file';
+          messageType.value = 'error';
+        }
+
+        // Clear the message after 3 seconds
+        setTimeout(() => {
+          message.value = '';
+        }, 3000);
+      };
+
+      reader.onerror = () => {
+        message.value = 'Error reading file';
+        messageType.value = 'error';
+      };
+
+      reader.readAsText(file);
+    }
     const cancelCreateAd = () => {
       navigateTo(Page.AdConfigs)
     }
@@ -669,7 +825,11 @@ export default {
       cancelPicking,
       startPicking,
       saveFormState,
-      restoreFormState
+      restoreFormState,
+      exportAdAsJson,
+      fileInput,
+      openImportFile,
+      handleFileSelect,
     }
   }
 }
@@ -1032,5 +1192,30 @@ button:disabled {
 .toggle-wrapper {
   display: flex;
   align-items: center;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.create-button,
+.import-button {
+  flex: 1;
+}
+
+.import-button {
+  background: #3182ce;
+}
+
+.import-button:hover {
+  background: #2c5282;
+}
+
+.ad-config-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

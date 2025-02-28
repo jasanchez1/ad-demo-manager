@@ -43,6 +43,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
   }
 
+  if (request.type === 'adSaved') {
+    console.log('[Background] Ad saved/updated, refreshing tabs for URL pattern:', request.url);
+    
+    chrome.tabs.query({}, (tabs) => {
+      let refreshedCount = 0;
+      
+      tabs.forEach(tab => {
+        if (tab.url && tab.url.match(new RegExp(request.url))) {
+          console.log(`[Background] Refreshing tab ${tab.id}: ${tab.url}`);
+          chrome.tabs.reload(tab.id);
+          refreshedCount++;
+        }
+      });
+      
+      console.log(`[Background] Refreshed ${refreshedCount} tabs`);
+      
+      if (sendResponse) {
+        sendResponse({ success: true, refreshedCount });
+      }
+    });
+    
+    return true; // Keep message channel open for async response
+  }
+  
   if (request.type === 'demoToggled') {
     chrome.tabs.query({}, (tabs) => {
       tabs.forEach(tab => {

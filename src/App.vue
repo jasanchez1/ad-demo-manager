@@ -48,7 +48,7 @@
                 <span class="ad-name">{{ config.name }}</span>
                 <span class="ad-type-badge">{{ `${config.adType.name} -
                   ${config.adType.width}x${config.adType.height}`
-                  }}</span>
+                }}</span>
               </div>
               <div class="ad-details">
                 <div class="ad-site">{{ config.site.name }}</div>
@@ -220,7 +220,7 @@ const getEmptyNewAd = (): AdConfig => ({
   adType: { id: 0, name: '', width: 0, height: 0 },
   site: { id: 0, name: '' },
   url: '',
-  isActive: true,
+  isActive: false,
   divId: '',
   keywordQueryParam: ''
 })
@@ -454,21 +454,57 @@ export default {
 
       adConfigs.value.push(finalAdConfig)
       saveAdConfigsToStorage()
+
+      // Refresh tabs matching the URL pattern if the ad is active
+      if (finalAdConfig.url && finalAdConfig.isActive) {
+        chrome.runtime.sendMessage({
+          type: 'adSaved',
+          url: finalAdConfig.url
+        });
+      }
+
       navigateTo(Page.AdConfigs)
     }
 
+    // Updated saveAdDetails function - with dimension fix and simplified refresh
     const saveAdDetails = () => {
       if (!selectedAd.value) return
 
+      // Find the complete ad type based on the selected ID
+      const selectedAdType = adTypes.value.find((type: AdType) => type.id === selectedAd.value?.adType.id)
+      const selectedSite = sites.value.find((site: Site) => site.id === selectedAd.value?.site.id)
+
+      // If we can't find a matching ad type or site, show an error
+      if (!selectedAdType || !selectedSite) {
+        message.value = 'Please select both ad type and site'
+        messageType.value = 'error'
+        return
+      }
+
+      // Create the updated config with the complete ad type and site info
+      const updatedAdConfig: AdConfig = {
+        ...selectedAd.value,
+        adType: selectedAdType, // Use the complete ad type with dimensions
+        site: selectedSite
+      }
+
+      // Update the array with the correct index
       const index = adConfigs.value.findIndex((ad: AdConfig) => ad.id === selectedAd.value?.id)
       if (index !== -1) {
-        adConfigs.value[index] = { ...selectedAd.value }
+        adConfigs.value[index] = updatedAdConfig
         saveAdConfigsToStorage()
+
+        // Refresh tabs matching the URL pattern if the ad is active
+        if (updatedAdConfig.url && updatedAdConfig.isActive) {
+          chrome.runtime.sendMessage({
+            type: 'adSaved',
+            url: updatedAdConfig.url
+          });
+        }
       }
 
       closeAdDetails()
     }
-
     const deleteAdConfig = (id: number) => {
       const index = adConfigs.value.findIndex((ad: AdConfig) => ad.id === id)
       if (index !== -1) {

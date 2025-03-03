@@ -213,7 +213,7 @@
   }
   
   .copy-status {
-    color: #38a169;
+    color: #4299e1;
     font-size: 12px;
     margin-bottom: 12px;
     text-align: right;

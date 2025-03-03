@@ -87,45 +87,97 @@ The Ad Demo Manager Chrome Extension is designed to help ad operations teams and
 
 Enable Demo Mode in settings to add visual highlighting to injected ads, making them easier to identify during testing.
 
-## Technical Details
+## Architecture
 
-### Architecture
+The extension follows a modular, service-oriented architecture using Vue.js Composition API:
 
-The extension consists of:
+### Core Components
 
-- **Popup UI**: Vue.js application for configuration management
-- **Background Script**: Handles API communication and extension events
-- **Content Script**: Injects ads into the target website
-- **Element Picker**: Visual tool for selecting page elements
+- **UI Layer**: Vue components for user interaction
+- **State Management**: Composable functions that manage specific aspects of application state
+- **Services Layer**: Service classes that handle external interactions (API, storage, etc.)
+- **Content Scripts**: Scripts that run in the context of web pages for ad injection
+- **Background Scripts**: Service worker for cross-context communication
 
-### Ad Injection Process
+### Architecture Diagram
 
-1. Content script loads on matched URLs
-2. Active configurations are retrieved from storage
-3. For each matching configuration:
-   - Request ad decisions from Kevel API
-   - Create and inject the ad into the specified container
-   - Set up impression tracking using IntersectionObserver
-   - Handle click tracking
+```
+App
+├── Components (UI)
+│   ├── AdForm
+│   ├── AdItemMenu
+│   └── ShareString
+│
+├── Composables (State & Logic)
+│   ├── useAdConfigs
+│   ├── useDemoMode
+│   ├── useElementPicker
+│   ├── useNavigation
+│   ├── useNetworkSettings
+│   └── useSharing
+│
+├── Services (External Interactions)
+│   ├── ApiService
+│   ├── StorageService
+│   ├── TabService
+│   └── SharingService
+│
+├── Content Scripts
+│   ├── content.js (Ad injection)
+│   └── picker.js (Element picker)
+│
+└── Background Scripts
+    └── background.js (Message handling)
+```
 
-### Category Parameter Support
+### Technical Details
 
-When a URL contains a category parameter (e.g., `?category=electronics`), the extension:
-1. Extracts the parameter value 
-2. Passes it to the Kevel API as a keyword
-3. Updates ads when the parameter changes without page reload
+#### Content Scripts
 
-### Configuration Sharing
+The content scripts run in the context of web pages:
 
-The ad sharing system uses:
-1. JSON stringification of the ad configuration
-2. URL encoding to handle special characters
-3. Base64 encoding for transportability
-4. The reverse process when importing
+1. **content.js**: Injects ads into matched web pages:
+   - Retrieves active configurations from storage
+   - Matches URL patterns
+   - Requests ads from Kevel API
+   - Injects banners into the page
+   - Handles impression/click tracking
 
-## Development
+2. **picker.js**: Provides the element picker functionality:
+   - Highlights elements on hover
+   - Enables selection of target containers
+   - Communicates with background script to save selection
 
-### Project Structure
+#### Background Script
+
+Acts as a communication bridge between different contexts:
+
+- Forwards API requests to the Kevel API
+- Handles configuration changes and tab refreshes
+- Manages popup reopening after element selection
+- Facilitates data sharing between contexts
+
+#### Services
+
+Service classes provide encapsulated functionality:
+
+- **ApiService**: Handles Kevel API communication
+- **StorageService**: Manages Chrome storage operations
+- **TabService**: Controls tab operations
+- **SharingService**: Handles configuration sharing/importing
+
+#### Composables
+
+Composable functions manage application state:
+
+- **useAdConfigs**: Manages ad configuration CRUD operations
+- **useDemoMode**: Controls demo mode settings
+- **useElementPicker**: Manages element picker state
+- **useNavigation**: Handles navigation between pages
+- **useNetworkSettings**: Manages API credentials
+- **useSharing**: Controls sharing UI and logic
+
+## Project Structure
 
 ```
 /                              # Root directory
@@ -140,21 +192,28 @@ The ad sharing system uses:
 │   │   ├── AdForm/            # Ad configuration form component
 │   │   ├── AdItemMenu/        # Menu for ad configuration actions
 │   │   └── ShareString/       # String-based sharing component
+│   ├── composables/           # Reusable state and logic
+│   │   ├── useAdConfigs.ts    # Ad configuration management
+│   │   ├── useDemoMode.ts     # Demo mode settings
+│   │   ├── useElementPicker.ts # Element picker functionality
+│   │   ├── useNavigation.ts   # Page navigation
+│   │   ├── useNetworkSettings.ts # API credentials management
+│   │   └── useSharing.ts      # Sharing functionality
+│   ├── services/              # External interaction services
+│   │   ├── api.service.ts     # Kevel API interactions
+│   │   ├── storage.service.ts # Chrome storage operations
+│   │   ├── tab.service.ts     # Chrome tabs operations
+│   │   └── sharing.service.ts # Configuration encoding/decoding
+│   ├── utils/                 # Utility functions
+│   │   └── message.ts         # Message display utilities
 │   ├── App.vue                # Main application component
 │   ├── main.ts                # Application entry point
 │   └── types/                 # TypeScript type definitions
 ├── scripts/                   # Build scripts
 ├── popup.html                 # Popup HTML template
 ├── package.json               # Dependencies and scripts
-└── styles.css                 # Extension styles
+└── tsconfig.json              # TypeScript configuration
 ```
-
-### Build Process
-
-The build process:
-1. Compiles the Vue application
-2. Generates icon assets
-3. Copies manifest and static files to the distribution folder
 
 ## Troubleshooting
 
@@ -165,6 +224,28 @@ The build process:
 - **Container not found**: Use the element picker to select a valid container
 - **Duplicate impressions**: The extension uses debouncing to prevent duplicate tracking notifications
 - **Import errors**: Ensure you're using the complete share code without any added spaces
+
+## Development
+
+### Building the Extension
+
+```bash
+# Install dependencies
+npm install
+
+# Build the extension
+npm run build
+
+# Clean build artifacts
+npm run clean
+```
+
+### Key Technologies
+
+- **Vue.js**: UI framework with Composition API
+- **TypeScript**: Type-safe JavaScript
+- **Chrome Extension API**: Browser integration
+- **Kevel API**: Ad serving platform
 
 ## License
 

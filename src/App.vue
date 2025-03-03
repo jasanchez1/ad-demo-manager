@@ -9,6 +9,7 @@
       </div>
     </div>
     <div class="content">
+      <!-- Settings Page -->
       <div class="settings" v-if="currentPage === Page.Settings">
         <h3 class="title">Network Settings</h3>
         <h5 class="menu-description">Before continuing, you need to set configure your network settings</h5>
@@ -39,6 +40,8 @@
           </div>
         </div>
       </div>
+
+      <!-- Ad Configurations Page -->
       <div v-if="currentPage === Page.AdConfigs">
         <h3 class="title">Ad Configurations</h3>
         <div class="ad-list">
@@ -48,7 +51,7 @@
                 <span class="ad-name">{{ config.name }}</span>
                 <span class="ad-type-badge">{{ `${config.adType.name} -
                   ${config.adType.width}x${config.adType.height}`
-                  }}</span>
+                }}</span>
               </div>
               <div class="ad-details">
                 <div class="ad-site">{{ config.site.name }}</div>
@@ -60,8 +63,12 @@
                 <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
                 <span class="slider"></span>
               </label>
-              <AdItemMenu @edit="openAdDetails(config)" @share="shareAdAsString(config)"
-                @delete="deleteAdConfig(config.id)" @click.stop />
+              <AdItemMenu 
+                @edit="openAdDetails(config)" 
+                @share="shareAdAsString(config)"
+                @delete="deleteAdConfig(config.id)" 
+                @click.stop 
+              />
             </div>
           </div>
         </div>
@@ -71,12 +78,15 @@
         </div>
       </div>
 
+      <!-- Edit Ad Form -->
       <AdForm v-if="currentPage === Page.EditConfig && selectedAd" :ad-data="selectedAd" :ad-types="adTypes"
-        :sites="sites" :is-edit="true" @start-picking="startPicking" @save="saveAdDetails" @cancel="closeAdDetails" />
+        :sites="sites" :is-edit="true" @start-picking="startPicking" @save="handleSaveAdDetails" @cancel="closeAdDetails" />
 
+      <!-- Create Ad Form -->
       <AdForm v-if="currentPage === Page.CreateConfig" :ad-data="newAd" :ad-types="adTypes" :sites="sites"
-        :is-edit="false" @start-picking="startPicking" @save="saveNewAd" @cancel="cancelCreateAd" />
+        :is-edit="false" @start-picking="startPicking" @save="handleSaveNewAd" @cancel="cancelCreateAd" />
 
+      <!-- Message Display -->
       <div v-if="message" :class="['message', messageType]">
         {{ message }}
       </div>
@@ -85,168 +95,52 @@
     <!-- Share/Import Modals -->
     <div v-if="showShareModal" class="modal-overlay" @click.self="showShareModal = false">
       <div class="modal-container">
-        <ShareString :config="shareConfig" :isImport="false" @close="showShareModal = false" />
+        <ShareString 
+          :config="shareConfig" 
+          :isImport="false"
+          @close="showShareModal = false" 
+        />
       </div>
     </div>
 
     <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
       <div class="modal-container">
-        <ShareString :isImport="true" @close="showImportModal = false" @import="handleImportFromString" />
+        <ShareString 
+          :isImport="true"
+          @close="showImportModal = false"
+          @import="handleImportFromString"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { Ref, ref, onMounted, watch } from '@vue/runtime-core'
-import { AdForm } from './components/AdForm'
-import { AdItemMenu } from './components/AdItemMenu'
-import { ShareString } from './components/ShareString'
-import type { Site, AdType, AdConfig, KevelAPIResponse, SiteResponse, AdTypeResponse } from '../src/types'
+import { onMounted, ref, watch } from 'vue';
+import { AdForm } from './components/AdForm';
+import { AdItemMenu } from './components/AdItemMenu';
+import { ShareString } from './components/ShareString';
 
-interface SavedFormState {
-  page: Page;
-  formData: {
-    selectedAd: AdConfig | null;
-    newAd: AdConfig | null;
-  };
-}
+// Import services
+import { 
+  apiService, 
+  storageService, 
+  tabService, 
+  sharingService 
+} from './services';
 
-class KevelApiError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-    this.name = 'KevelApiError';
-  }
-}
+// Import composables
+import {
+  useNetworkSettings,
+  useAdConfigs,
+  useElementPicker,
+  useNavigation,
+  useSharing,
+  useDemoMode
+} from './composables';
 
-class UnauthorizedError extends KevelApiError {
-  constructor(message: string = 'Invalid API key') {
-    super(401, message);
-    this.name = 'UnauthorizedError';
-  }
-}
-
-enum Page {
-  Settings = "settings",
-  AdConfigs = "adConfigs",
-  EditConfig = "editConfig",
-  CreateConfig = "createConfig"
-}
-
-
-async function getSites(apiKey: string): Promise<Site[]> {
-  const response = await new Promise<KevelAPIResponse<SiteResponse>>(resolve => {
-    chrome.runtime.sendMessage({
-      type: 'site',
-      apiKey: apiKey
-    }, resolve);
-  });
-
-  if (!response.success) {
-    if (response.status === 403) {
-      throw new UnauthorizedError();
-    }
-    throw new KevelApiError(response.status || 500, response.error || 'Unknown error');
-  }
-
-  // Type guard to ensure data and items exist
-  if (!response.data?.items) {
-    throw new KevelApiError(500, 'Invalid response format');
-  }
-
-  return response.data.items.map((x) => ({
-    id: x.Id,
-    name: x.Title
-  }));
-}
-
-
-async function getAdTypes(apiKey: string): Promise<AdType[]> {
-  const response = await new Promise<KevelAPIResponse<AdTypeResponse>>(resolve => {
-    chrome.runtime.sendMessage({
-      type: 'adtypes',
-      apiKey: apiKey
-    }, resolve);
-  });
-
-  if (!response.success) {
-    if (response.status === 403) {
-      throw new UnauthorizedError();
-    }
-    throw new KevelApiError(response.status || 500, response.error || 'Unknown error');
-  }
-
-  if (!response.data?.items) {
-    throw new KevelApiError(500, 'Invalid response format');
-  }
-
-  // TODO: It's currently limited by pagination.
-  return response.data.items.map(x => {
-    return {
-      id: x.Id,
-      name: x.Name,
-      height: x.Height,
-      width: x.Width
-    }
-  })
-
-}
-
-interface Setup {
-  saveSettings: () => Promise<void>;
-  navigateTo: (page: Page) => void;
-  navigateBack: () => void;
-  toggleAdConfig: (id: number) => void;
-  createNewAd: () => void;
-  cancelCreateAd: () => void;
-  saveNewAd: () => void;
-  saveAdDetails: () => void;
-  openAdDetails: (config: AdConfig) => void;
-  closeAdDetails: () => void;
-  deleteAdConfig: (id: number) => void;
-  saveDemoMode: () => void;
-  cancelPicking: () => void;
-  startPicking: () => void;
-  saveFormState: () => void;
-  restoreFormState: () => void;
-  shareAdAsString: (config: AdConfig) => void;
-  openImportFromString: () => void;
-  handleImportFromString: (importedConfig: any) => void;
-  isPicking: Ref<boolean>;
-  networkId: Ref<string>;
-  apiKey: Ref<string>;
-  message: Ref<string>;
-  messageType: Ref<string>;
-  savedValues: Ref<{
-    networkId: string;
-    apiKey: string;
-  }>;
-  adConfigs: Ref<AdConfig[]>;
-  adTypes: Ref<AdType[]>;
-  sites: Ref<Site[]>;
-  selectedAd: Ref<AdConfig | null>;
-  currentPage: Ref<Page>;
-  Page: typeof Page;
-  isLoading: Ref<boolean>;
-  newAd: Ref<AdConfig>;
-  demoMode: Ref<boolean>;
-  showShareModal: Ref<boolean>;
-  showImportModal: Ref<boolean>;
-  shareConfig: Ref<AdConfig | null>;
-}
-
-const getEmptyNewAd = (): AdConfig => ({
-  id: 0,
-  name: '',
-  adType: { id: 0, name: '', width: 0, height: 0 },
-  site: { id: 0, name: '' },
-  url: '',
-  isActive: false,
-  divId: '',
-  keywordQueryParam: ''
-})
+// Import types
+import type { AdConfig } from './types';
 
 export default {
   components: {
@@ -254,529 +148,148 @@ export default {
     AdItemMenu,
     ShareString
   },
-  setup(): Setup {
-    const networkId = ref('')
-    const apiKey = ref('')
-    const message = ref('')
-    const messageType = ref('')
-    const isPicking = ref(false)
-    const savedValues = ref({ networkId: '', apiKey: '' })
-    const currentPage = ref<Page>(Page.AdConfigs)
-    const lastPage = ref<Page>(Page.AdConfigs)
-    const adTypes = ref<AdType[]>([])
-    const sites = ref<Site[]>([])
-    const isLoading = ref(false)
-    const adConfigs = ref<AdConfig[]>([])
-    const newAd = ref<AdConfig>(getEmptyNewAd())
-    const selectedAd = ref<AdConfig | null>(null)
-    const showShareModal = ref(false)
-    const showImportModal = ref(false)
-    const shareConfig = ref<AdConfig | null>(null)
+  setup() {
+    // Initialize message state
+    const message = ref('');
+    const messageType = ref('');
 
-    const navigateTo = (page: Page) => {
-      lastPage.value = currentPage.value;
-      currentPage.value = page;
-    }
+    // Initialize composables
+    const networkSettings = useNetworkSettings();
+    const { 
+      networkId, 
+      apiKey, 
+      savedValues, 
+      isLoading, 
+      sites, 
+      adTypes, 
+      loadSavedValues, 
+      saveSettings 
+    } = networkSettings;
 
-    const navigateBack = () => {
-      currentPage.value = lastPage.value;
-      lastPage.value = currentPage.value;
-    }
+    const adConfigsManager = useAdConfigs(adTypes, sites, message, messageType);
+    const { 
+      adConfigs, 
+      selectedAd, 
+      newAd, 
+      loadAdConfigs, 
+      toggleAdConfig, 
+      deleteAdConfig, 
+      saveAdDetails, 
+      saveNewAd, 
+      importAdConfig 
+    } = adConfigsManager;
 
-    const openAdDetails = (config: AdConfig) => {
-      selectedAd.value = { ...config }
-      navigateTo(Page.EditConfig);
-    }
+    const navigation = useNavigation(selectedAd, newAd);
+    const { 
+      currentPage, 
+      Page, 
+      navigateTo, 
+      navigateBack, 
+      openAdDetails, 
+      closeAdDetails, 
+      createNewAd, 
+      cancelCreateAd 
+    } = navigation;
 
-    const closeAdDetails = () => {
-      selectedAd.value = null
-      navigateTo(Page.AdConfigs);
-    }
+    const sharing = useSharing(importAdConfig);
+    const { 
+      showShareModal, 
+      showImportModal, 
+      shareConfig, 
+      shareAdAsString, 
+      openImportFromString, 
+      handleImportFromString 
+    } = sharing;
 
-    const saveFormState = () => {
-      const state: SavedFormState = {
-        page: currentPage.value,
-        formData: {
-          selectedAd: selectedAd.value ? { ...selectedAd.value } : null,
-          newAd: currentPage.value === Page.CreateConfig ? { ...newAd.value } : null
-        }
-      };
+    const demoManager = useDemoMode();
+    const { demoMode, loadDemoMode, saveDemoMode } = demoManager;
 
-      // Save to chrome.storage
-      chrome.storage.local.set({ savedFormState: state }, () => {
-        if (chrome.runtime.lastError) {
-          console.error('Error saving form state:', chrome.runtime.lastError);
-        }
-      });
-    };
+    const elementPicker = useElementPicker(selectedAd, newAd, currentPage);
+    const { isPicking, startPicking, checkForContainerValue } = elementPicker;
 
-    const startPicking = () => {
-      // Save the current page and form state with more detailed info
-      const currentState = {
-        page: currentPage.value,
-        editAd: selectedAd.value ? JSON.parse(JSON.stringify(selectedAd.value)) : null,
-        newAd: currentPage.value === Page.CreateConfig ? JSON.parse(JSON.stringify(newAd.value)) : null
-      };
-
-      // Log the state we're saving
-      console.log('Saving picker state:', currentState);
-
-      // Store current state in local storage
-      chrome.storage.local.set({ pickerState: currentState }, () => {
-        console.log('Picker state saved to storage');
-      });
-
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          // Send message to activate picker
-          chrome.tabs.sendMessage(tabs[0].id, { action: 'startPicking' }, (response) => {
-            if (response && response.status === 'activated') {
-              console.log('Picker activated, closing popup');
-              window.close();
-            } else {
-              console.error('Failed to activate picker');
-            }
-          });
-        }
-      });
-    };
-
-    const restoreFormState = () => {
-      chrome.storage.local.get(['savedFormState'], (result) => {
-        if (result.savedFormState) {
-          const state = result.savedFormState as SavedFormState;
-
-          // Restore page
-          currentPage.value = state.page;
-
-          // Restore form data
-          if (state.formData.selectedAd) {
-            selectedAd.value = state.formData.selectedAd;
-          }
-          if (state.formData.newAd && state.page === Page.CreateConfig) {
-            newAd.value = state.formData.newAd;
-          }
-
-          // Clear saved state after restoring
-          chrome.storage.local.remove(['savedFormState']);
-        }
-      });
-    };
-
-    watch(() => isPicking.value, (newValue: boolean) => {
+    // Watch for picking mode to update the document attribute
+    watch(() => isPicking.value, (newValue) => {
       document.documentElement.setAttribute('data-picking', newValue.toString());
     });
 
-    const fetchNetworkDetails = async (apiKey: string) => {
-      try {
-        sites.value = await getSites(apiKey);
-        adTypes.value = await getAdTypes(apiKey)
-      } catch (error) {
-        if (error instanceof UnauthorizedError) {
-          // Handle unauthorized case specifically
-          return {
-            valid: false,
-            message: 'The API Key is not authorized.'
-          }
-        }
-        return {
-          valid: false,
-          message: 'Error communicating with the Kevel API'
-        }
+    // Handler for saving ad details
+    const handleSaveAdDetails = async () => {
+      if (await saveAdDetails()) {
+        closeAdDetails();
       }
-    }
+    };
 
-    // Validation function
-    const validateSettingsInput = async (): Promise<{ valid: boolean; message: string }> => {
-      // Check if both fields are filled
-      if (!networkId.value || !apiKey.value) {
-        return {
-          valid: false,
-          message: 'Both Network ID and API Key are required'
-        }
+    // Handler for saving new ad
+    const handleSaveNewAd = async () => {
+      if (await saveNewAd()) {
+        navigateTo(Page.AdConfigs);
       }
+    };
 
-      // Check if networkId is numeric
-      if (!/^\d+$/.test(networkId.value)) {
-        return {
-          valid: false,
-          message: 'Network ID must be numeric'
-        }
-      }
-      const fetchError = await fetchNetworkDetails(apiKey.value)
-      if (fetchError !== undefined) {
-        return fetchError
-      }
-      return { valid: true, message: '' }
-    }
-
-    const loadSavedValues = () => {
-      chrome.storage.sync.get(['networkId', 'apiKey', 'adConfigs'], (result) => {
-        console.log('Loaded values:', result)
-        const loadedNetworkId = result.networkId || ''
-        const loadedApiKey = result.apiKey || ''
-        const loadedAdConfigs: AdConfig[] = result.adConfigs ? Object.values(result.adConfigs) : [];
-
-        networkId.value = loadedNetworkId
-        apiKey.value = loadedApiKey
-        adConfigs.value = loadedAdConfigs
-
-        savedValues.value = {
-          networkId: loadedNetworkId,
-          apiKey: loadedApiKey
-        }
-
-        if (!loadedApiKey || !loadedNetworkId) {
-          navigateTo(Page.Settings)
-        } else {
-          fetchNetworkDetails(apiKey.value)
-        }
-      })
-    }
-
-    const createNewAd = () => {
-      newAd.value = getEmptyNewAd();
-      navigateTo(Page.CreateConfig)
-    }
-
-    // For sharing ad configurations as a string
-    const shareAdAsString = (config: AdConfig) => {
-      shareConfig.value = { ...config }
-      showShareModal.value = true
-    }
-
-    // Open the import modal
-    const openImportFromString = () => {
-      showImportModal.value = true
-    }
-
-    // Handle importing an ad config from a string
-    const handleImportFromString = (importedConfig: any) => {
-      try {
-        // Find or fallback to default ad type
-        let adType = adTypes.value.find(t =>
-          t.name === importedConfig.adType.name &&
-          t.width === importedConfig.adType.width &&
-          t.height === importedConfig.adType.height
-        );
-
-        if (!adType && adTypes.value.length > 0) {
-          adType = adTypes.value[0];
-        }
-
-        // Find or fallback to default site
-        let site = sites.value.find(s => s.name === importedConfig.site.name);
-        if (!site && sites.value.length > 0) {
-          site = sites.value[0];
-        }
-
-        // Require valid type and site
-        if (!adType || !site) {
-          message.value = 'Could not match ad type or site. Please configure network settings first.';
-          messageType.value = 'error';
-          return;
-        }
-
-        // Generate new ID
-        const newId = Math.max(0, ...adConfigs.value.map((ad) => ad.id)) + 1;
-
-        // Create final config
-        const finalConfig = {
-          id: newId,
-          name: importedConfig.name,
-          adType: adType,
-          site: site,
-          url: importedConfig.url,
-          divId: importedConfig.divId,
-          isActive: importedConfig.isActive ?? false, // Default to inactive for safety
-          keywordQueryParam: importedConfig.keywordQueryParam || ''
-        };
-
-        // Add to configs and save
-        adConfigs.value.push(finalConfig);
-        saveAdConfigsToStorage();
-
-        message.value = 'Ad configuration imported successfully!';
-        messageType.value = 'success';
-
-        setTimeout(() => {
-          message.value = '';
-        }, 3000);
-      } catch (error) {
-        console.error('Error importing config:', error);
-        message.value = 'Error importing configuration';
-        messageType.value = 'error';
-      }
-    }
-
-    const cancelCreateAd = () => {
-      navigateTo(Page.AdConfigs)
-    }
-
-    const saveAdConfigsToStorage = () => {
-      chrome.storage.sync.set({
-        adConfigs: adConfigs.value
-      }, () => {
-        if (chrome.runtime.lastError) {
-          console.error('Save error:', chrome.runtime.lastError)
-          message.value = 'Error saving ad configurations'
-          messageType.value = 'error'
-        } else {
-          message.value = 'Ad configurations saved successfully!'
-          messageType.value = 'success'
-        }
-        // Clear message after 3 seconds
-        setTimeout(() => {
-          message.value = ''
-        }, 3000)
-      })
-    }
-
-    const saveNewAd = () => {
-      const newId = Math.max(0, ...adConfigs.value.map((ad: AdConfig) => ad.id)) + 1
-      const selectedAdType = adTypes.value.find((type: AdType) => type.id === newAd.value.adType.id)
-      const selectedSite = sites.value.find((site: Site) => site.id === newAd.value.site.id)
-
-      if (!selectedAdType || !selectedSite) {
-        message.value = 'Please select both ad type and site'
-        messageType.value = 'error'
-        return
-      }
-
-      const finalAdConfig: AdConfig = {
-        ...newAd.value,
-        id: newId,
-        adType: selectedAdType,
-        site: selectedSite
-      }
-
-      adConfigs.value.push(finalAdConfig)
-      saveAdConfigsToStorage()
-
-      // Refresh tabs matching the URL pattern if the ad is active
-      if (finalAdConfig.url && finalAdConfig.isActive) {
-        chrome.runtime.sendMessage({
-          type: 'adSaved',
-          url: finalAdConfig.url
-        });
-      }
-
-      navigateTo(Page.AdConfigs)
-    }
-
-    // Updated saveAdDetails function - with dimension fix and simplified refresh
-    const saveAdDetails = () => {
-      if (!selectedAd.value) return
-
-      // Find the complete ad type based on the selected ID
-      const selectedAdType = adTypes.value.find((type: AdType) => type.id === selectedAd.value?.adType.id)
-      const selectedSite = sites.value.find((site: Site) => site.id === selectedAd.value?.site.id)
-
-      // If we can't find a matching ad type or site, show an error
-      if (!selectedAdType || !selectedSite) {
-        message.value = 'Please select both ad type and site'
-        messageType.value = 'error'
-        return
-      }
-
-      // Create the updated config with the complete ad type and site info
-      const updatedAdConfig: AdConfig = {
-        ...selectedAd.value,
-        adType: selectedAdType, // Use the complete ad type with dimensions
-        site: selectedSite
-      }
-
-      // Update the array with the correct index
-      const index = adConfigs.value.findIndex((ad: AdConfig) => ad.id === selectedAd.value?.id)
-      if (index !== -1) {
-        adConfigs.value[index] = updatedAdConfig
-        saveAdConfigsToStorage()
-
-        // Refresh tabs matching the URL pattern if the ad is active
-        if (updatedAdConfig.url && updatedAdConfig.isActive) {
-          chrome.runtime.sendMessage({
-            type: 'adSaved',
-            url: updatedAdConfig.url
-          });
-        }
-      }
-
-      closeAdDetails()
-    }
-    const deleteAdConfig = (id: number) => {
-      const index = adConfigs.value.findIndex((ad: AdConfig) => ad.id === id)
-      if (index !== -1) {
-        adConfigs.value.splice(index, 1)
-        saveAdConfigsToStorage()
-      }
-    }
-
-    const toggleAdConfig = (id: number) => {
-      const config = adConfigs.value.find((c: AdConfig) => c.id === id)
-      if (config) {
-        config.isActive = !config.isActive
-        saveAdConfigsToStorage()
-        chrome.runtime.sendMessage({
-          type: 'configToggled',
-          url: config.url
-        });
-      }
-    }
-
-    const saveSettings = async () => {
-      // Validate before saving
-      isLoading.value = true
-      const validation = await validateSettingsInput()
-
-      if (!validation.valid) {
-        message.value = validation.message
-        messageType.value = 'error'
-        setTimeout(() => {
-          message.value = ''
-        }, 3000)
-        isLoading.value = false
-        return
-      }
-      console.log('Saving values:', { networkId: networkId.value, apiKey: apiKey.value })
-      chrome.storage.sync.set({
-        networkId: networkId.value,
-        apiKey: apiKey.value
-      }, () => {
-        // Check for any chrome.runtime errors
-        if (chrome.runtime.lastError) {
-          console.error('Save error:', chrome.runtime.lastError)
-          message.value = 'Error saving settings'
-          messageType.value = 'error'
-        } else {
-          console.log('Settings saved successfully')
-          message.value = 'Settings saved successfully!'
-          messageType.value = 'success'
-          loadSavedValues(); // Reload the saved values
-          navigateBack();
-        }
-        isLoading.value = false
-        // Clear message after 3 seconds
-        setTimeout(() => {
-          message.value = ''
-        }, 3000)
-      })
-    }
-
-    const demoMode = ref(false)
-
-    // Load demo mode setting
-    const loadDemoMode = () => {
-      chrome.storage.sync.get(['demoMode'], (result) => {
-        demoMode.value = result.demoMode || false
-      })
-    }
-
-    const saveDemoMode = () => {
-      chrome.storage.sync.set({
-        demoMode: demoMode.value
-      })
-
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id) {
-          chrome.tabs.reload(tabs[0].id);
-        }
-      });
-    }
-
-    const cancelPicking = () => {
-      isPicking.value = false;
-    }
-
-    onMounted(() => {
-      // Before doing any other loading, check for direct container value
-      chrome.storage.local.get(['directContainerValue', 'directContainerTimestamp', 'pickerState'], (result) => {
-        console.log('[App] Found on mount:', result);
-
-        // If we have a direct container value that's fresh (less than 5 seconds old)
-        if (result.directContainerValue && result.directContainerTimestamp) {
-          const ageInMs = Date.now() - result.directContainerTimestamp;
-          if (ageInMs < 5000) { // Only use if less than 5 seconds old
-            console.log('[App] Found fresh direct container value:', result.directContainerValue);
-
-            // We need to restore the page first from pickerState
-            if (result.pickerState && result.pickerState.page) {
-              console.log('[App] Restoring page from picker state:', result.pickerState.page);
-              currentPage.value = result.pickerState.page;
-
-              // Then restore the appropriate form data
-              if (result.pickerState.page === Page.EditConfig && result.pickerState.editAd) {
-                selectedAd.value = result.pickerState.editAd;
-                console.log('[App] Restored edit ad');
-
-                // Finally apply the container value
-                if (selectedAd.value) {
-                  selectedAd.value.divId = result.directContainerValue;
-                  console.log('[App] Applied container to edit ad:', result.directContainerValue);
-                }
-              } else if (result.pickerState.page === Page.CreateConfig && result.pickerState.newAd) {
-                newAd.value = result.pickerState.newAd;
-                console.log('[App] Restored new ad');
-
-                // Apply container value
-                newAd.value.divId = result.directContainerValue;
-                console.log('[App] Applied container to new ad:', result.directContainerValue);
-              }
-            }
-
-            // Clean up storage
-            chrome.storage.local.remove(['directContainerValue', 'directContainerTimestamp']);
-          } else {
-            console.log('[App] Direct container value too old, not using');
-          }
-        }
-
-        // Continue with normal loading
-        loadSavedValues();
-        loadDemoMode();
-      });
+    // Initialize on mount
+    onMounted(async () => {
+      // Check for container value from picker
+      await checkForContainerValue();
+      
+      // Load saved values
+      await loadSavedValues();
+      await loadAdConfigs();
+      await loadDemoMode();
     });
 
     return {
+      // Network settings
       networkId,
       apiKey,
-      message,
-      messageType,
       savedValues,
-      saveSettings,
-      navigateTo,
-      deleteAdConfig,
-      navigateBack,
-      saveNewAd,
-      adConfigs,
-      toggleAdConfig,
-      createNewAd,
-      cancelCreateAd,
-      adTypes,
+      isLoading,
       sites,
+      adTypes,
+      saveSettings,
+
+      // Ad configs
+      adConfigs,
       selectedAd,
-      openAdDetails,
-      closeAdDetails,
-      saveAdDetails,
+      newAd,
+      toggleAdConfig,
+      deleteAdConfig,
+
+      // Navigation
       currentPage,
       Page,
-      isLoading,
-      newAd,
-      demoMode,
-      saveDemoMode,
+      navigateTo,
+      navigateBack,
+      openAdDetails,
+      closeAdDetails,
+      createNewAd,
+      cancelCreateAd,
+
+      // Element picker
       isPicking,
-      cancelPicking,
       startPicking,
-      saveFormState,
-      restoreFormState,
+
+      // Sharing
       showShareModal,
       showImportModal,
       shareConfig,
       shareAdAsString,
       openImportFromString,
       handleImportFromString,
-    }
+
+      // Demo mode
+      demoMode,
+      saveDemoMode,
+
+      // UI handlers
+      handleSaveAdDetails,
+      handleSaveNewAd,
+
+      // Messages
+      message,
+      messageType
+    };
   }
-}
+};
 </script>
 
 <style>
@@ -1163,6 +676,7 @@ button:disabled {
   gap: 8px;
 }
 
+/* Modal Styles */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1187,7 +701,6 @@ button:disabled {
     opacity: 0;
     transform: translateY(-10px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);

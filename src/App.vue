@@ -48,7 +48,7 @@
                 <span class="ad-name">{{ config.name }}</span>
                 <span class="ad-type-badge">{{ `${config.adType.name} -
                   ${config.adType.width}x${config.adType.height}`
-                }}</span>
+                  }}</span>
               </div>
               <div class="ad-details">
                 <div class="ad-site">{{ config.site.name }}</div>
@@ -60,16 +60,14 @@
                 <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
                 <span class="slider"></span>
               </label>
-              <AdItemMenu @edit="openAdDetails(config)" @export="exportAdAsJson(config)"
+              <AdItemMenu @edit="openAdDetails(config)" @share="shareAdAsString(config)"
                 @delete="deleteAdConfig(config.id)" @click.stop />
             </div>
           </div>
         </div>
         <div class="action-buttons">
           <button class="create-button" @click="createNewAd">Create New Ad</button>
-          <button class="import-button" @click="openImportFile">Import Ad</button>
-
-          <input type="file" ref="fileInput" @change="handleFileSelect" accept=".json" style="display: none" />
+          <button class="import-button" @click="openImportFromString">Import Ad</button>
         </div>
       </div>
 
@@ -83,6 +81,19 @@
         {{ message }}
       </div>
     </div>
+
+    <!-- Share/Import Modals -->
+    <div v-if="showShareModal" class="modal-overlay" @click.self="showShareModal = false">
+      <div class="modal-container">
+        <ShareString :config="shareConfig" :isImport="false" @close="showShareModal = false" />
+      </div>
+    </div>
+
+    <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
+      <div class="modal-container">
+        <ShareString :isImport="true" @close="showImportModal = false" @import="handleImportFromString" />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -90,7 +101,7 @@
 import { Ref, ref, onMounted, watch } from '@vue/runtime-core'
 import { AdForm } from './components/AdForm'
 import { AdItemMenu } from './components/AdItemMenu'
-import { ImportFromFile } from './components/ImportFromFile'
+import { ShareString } from './components/ShareString'
 import type { Site, AdType, AdConfig, KevelAPIResponse, SiteResponse, AdTypeResponse } from '../src/types'
 
 interface SavedFormState {
@@ -200,13 +211,9 @@ interface Setup {
   startPicking: () => void;
   saveFormState: () => void;
   restoreFormState: () => void;
-  exportAdAsJson: (config: AdConfig) => void;
-  openImportDialog: () => void;
-  handleImportedConfig: (config: any) => void;
-  openImportFile: () => void;
-  handleFileSelect: (event: Event) => void;
-  fileInput: Ref<HTMLInputElement | null>;
-  importFileRef: Ref<{ openFileDialog: () => void } | null>;
+  shareAdAsString: (config: AdConfig) => void;
+  openImportFromString: () => void;
+  handleImportFromString: (importedConfig: any) => void;
   isPicking: Ref<boolean>;
   networkId: Ref<string>;
   apiKey: Ref<string>;
@@ -225,6 +232,9 @@ interface Setup {
   isLoading: Ref<boolean>;
   newAd: Ref<AdConfig>;
   demoMode: Ref<boolean>;
+  showShareModal: Ref<boolean>;
+  showImportModal: Ref<boolean>;
+  shareConfig: Ref<AdConfig | null>;
 }
 
 const getEmptyNewAd = (): AdConfig => ({
@@ -242,14 +252,13 @@ export default {
   components: {
     AdForm,
     AdItemMenu,
-    ImportFromFile
+    ShareString
   },
   setup(): Setup {
     const networkId = ref('')
     const apiKey = ref('')
     const message = ref('')
     const messageType = ref('')
-    const fileInput = ref<HTMLInputElement | null>(null);
     const isPicking = ref(false)
     const savedValues = ref({ networkId: '', apiKey: '' })
     const currentPage = ref<Page>(Page.AdConfigs)
@@ -260,6 +269,9 @@ export default {
     const adConfigs = ref<AdConfig[]>([])
     const newAd = ref<AdConfig>(getEmptyNewAd())
     const selectedAd = ref<AdConfig | null>(null)
+    const showShareModal = ref(false)
+    const showImportModal = ref(false)
+    const shareConfig = ref<AdConfig | null>(null)
 
     const navigateTo = (page: Page) => {
       lastPage.value = currentPage.value;
@@ -427,146 +439,76 @@ export default {
       navigateTo(Page.CreateConfig)
     }
 
-    const exportAdAsJson = (config: AdConfig) => {
+    // For sharing ad configurations as a string
+    const shareAdAsString = (config: AdConfig) => {
+      shareConfig.value = { ...config }
+      showShareModal.value = true
+    }
+
+    // Open the import modal
+    const openImportFromString = () => {
+      showImportModal.value = true
+    }
+
+    // Handle importing an ad config from a string
+    const handleImportFromString = (importedConfig: any) => {
       try {
-        // Create a clone of the config to export
-        const configToExport = { ...config }
+        // Find or fallback to default ad type
+        let adType = adTypes.value.find(t =>
+          t.name === importedConfig.adType.name &&
+          t.width === importedConfig.adType.width &&
+          t.height === importedConfig.adType.height
+        );
 
-        // Convert to JSON string
-        const jsonString = JSON.stringify(configToExport, null, 2)
-
-        // Create blob and trigger download
-        const blob = new Blob([jsonString], { type: 'application/json' })
-        const url = URL.createObjectURL(blob)
-
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${config.name.replace(/\s+/g, '-').toLowerCase()}.json`
-        document.body.appendChild(a)
-        a.click()
-
-        // Cleanup
-        setTimeout(() => {
-          document.body.removeChild(a)
-          URL.revokeObjectURL(url)
-        }, 100)
-
-        message.value = 'Ad configuration exported successfully'
-        messageType.value = 'success'
-
-        setTimeout(() => {
-          message.value = ''
-        }, 3000)
-      } catch (error) {
-        console.error('Export error:', error)
-        message.value = 'Error exporting ad configuration'
-        messageType.value = 'error'
-
-        setTimeout(() => {
-          message.value = ''
-        }, 3000)
-      }
-    }
-
-    const openImportFile = () => {
-      // Reset the input to ensure the change event fires even if the same file is selected
-      if (fileInput.value) {
-        fileInput.value.value = '';
-        fileInput.value.click();
-      }
-    }
-
-    const handleFileSelect = (event: Event) => {
-      const input = event.target as HTMLInputElement;
-      const file = input.files?.[0];
-
-      if (!file) {
-        message.value = 'No file selected';
-        messageType.value = 'error';
-        return;
-      }
-
-      const reader = new FileReader();
-
-      reader.onload = (e) => {
-        try {
-          const content = e.target?.result as string;
-          const importedConfig = JSON.parse(content);
-
-          // Get config from array if needed
-          const config = Array.isArray(importedConfig) ? importedConfig[0] : importedConfig;
-
-          // Basic validation
-          if (!config || !config.name || !config.adType || !config.site || !config.url || !config.divId) {
-            message.value = 'Invalid configuration format';
-            messageType.value = 'error';
-            return;
-          }
-
-          // Generate new ID
-          const newId = Math.max(0, ...adConfigs.value.map((ad: AdConfig) => ad.id)) + 1;
-
-          // Find or fallback to default ad type
-          let adType = adTypes.value.find(t =>
-            t.name === config.adType.name &&
-            t.width === config.adType.width &&
-            t.height === config.adType.height
-          );
-
-          if (!adType && adTypes.value.length > 0) {
-            adType = adTypes.value[0];
-          }
-
-          // Find or fallback to default site
-          let site = sites.value.find(s => s.name === config.site.name);
-          if (!site && sites.value.length > 0) {
-            site = sites.value[0];
-          }
-
-          // Require valid type and site
-          if (!adType || !site) {
-            message.value = 'Could not match ad type or site. Please configure network settings first.';
-            messageType.value = 'error';
-            return;
-          }
-
-          // Create final config
-          const finalConfig: AdConfig = {
-            id: newId,
-            name: config.name,
-            adType: adType,
-            site: site,
-            url: config.url,
-            divId: config.divId,
-            isActive: config.isActive ?? true,
-            keywordQueryParam: config.keywordQueryParam || ''
-          };
-
-          // Add to configs and save
-          adConfigs.value.push(finalConfig);
-          saveAdConfigsToStorage();
-
-          message.value = 'Ad configuration imported successfully';
-          messageType.value = 'success';
-        } catch (error) {
-          console.error('Import error:', error);
-          message.value = 'Error parsing JSON file';
-          messageType.value = 'error';
+        if (!adType && adTypes.value.length > 0) {
+          adType = adTypes.value[0];
         }
 
-        // Clear the message after 3 seconds
+        // Find or fallback to default site
+        let site = sites.value.find(s => s.name === importedConfig.site.name);
+        if (!site && sites.value.length > 0) {
+          site = sites.value[0];
+        }
+
+        // Require valid type and site
+        if (!adType || !site) {
+          message.value = 'Could not match ad type or site. Please configure network settings first.';
+          messageType.value = 'error';
+          return;
+        }
+
+        // Generate new ID
+        const newId = Math.max(0, ...adConfigs.value.map((ad) => ad.id)) + 1;
+
+        // Create final config
+        const finalConfig = {
+          id: newId,
+          name: importedConfig.name,
+          adType: adType,
+          site: site,
+          url: importedConfig.url,
+          divId: importedConfig.divId,
+          isActive: importedConfig.isActive ?? false, // Default to inactive for safety
+          keywordQueryParam: importedConfig.keywordQueryParam || ''
+        };
+
+        // Add to configs and save
+        adConfigs.value.push(finalConfig);
+        saveAdConfigsToStorage();
+
+        message.value = 'Ad configuration imported successfully!';
+        messageType.value = 'success';
+
         setTimeout(() => {
           message.value = '';
         }, 3000);
-      };
-
-      reader.onerror = () => {
-        message.value = 'Error reading file';
+      } catch (error) {
+        console.error('Error importing config:', error);
+        message.value = 'Error importing configuration';
         messageType.value = 'error';
-      };
-
-      reader.readAsText(file);
+      }
     }
+
     const cancelCreateAd = () => {
       navigateTo(Page.AdConfigs)
     }
@@ -826,10 +768,12 @@ export default {
       startPicking,
       saveFormState,
       restoreFormState,
-      exportAdAsJson,
-      fileInput,
-      openImportFile,
-      handleFileSelect,
+      showShareModal,
+      showImportModal,
+      shareConfig,
+      shareAdAsString,
+      openImportFromString,
+      handleImportFromString,
     }
   }
 }
@@ -1217,5 +1161,36 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-container {
+  width: 90%;
+  max-width: 360px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

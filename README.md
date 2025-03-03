@@ -15,6 +15,7 @@ The Ad Demo Manager Chrome Extension is designed to help ad operations teams and
 - **Demo Mode**: Highlight injected ads with visual indicators for easy identification
 - **Real-time Tracking**: Display notifications for impression and click tracking events
 - **Network Settings**: Configure network ID and API key for Kevel integration
+- **Configuration Sharing**: Easily share ad configurations with team members via encoded strings
 
 ## Installation
 
@@ -66,7 +67,21 @@ The Ad Demo Manager Chrome Extension is designed to help ad operations teams and
 
 - Toggle configurations on/off using the switch
 - Edit existing configurations by clicking on them
-- Delete configurations using the X icon
+- Delete configurations using the menu options
+
+### Sharing Configurations
+
+1. Click the menu icon (⋮) for an ad configuration
+2. Select "Share"
+3. Copy the generated share code
+4. Share the code with your team members
+
+### Importing Configurations
+
+1. Click the "Import Ad" button
+2. Paste a share code into the import modal
+3. Click "Import"
+4. The configuration will be added to your list
 
 ### Demo Mode
 
@@ -100,6 +115,14 @@ When a URL contains a category parameter (e.g., `?category=electronics`), the ex
 2. Passes it to the Kevel API as a keyword
 3. Updates ads when the parameter changes without page reload
 
+### Configuration Sharing
+
+The ad sharing system uses:
+1. JSON stringification of the ad configuration
+2. URL encoding to handle special characters
+3. Base64 encoding for transportability
+4. The reverse process when importing
+
 ## Development
 
 ### Project Structure
@@ -114,6 +137,9 @@ When a URL contains a category parameter (e.g., `?category=electronics`), the ex
 │   └── styles.css             # Global styles
 ├── src/                       # Vue application
 │   ├── components/            # Vue components
+│   │   ├── AdForm/            # Ad configuration form component
+│   │   ├── AdItemMenu/        # Menu for ad configuration actions
+│   │   └── ShareString/       # String-based sharing component
 │   ├── App.vue                # Main application component
 │   ├── main.ts                # Application entry point
 │   └── types/                 # TypeScript type definitions
@@ -138,6 +164,7 @@ The build process:
 - **API errors**: Check your Network ID and API key in settings
 - **Container not found**: Use the element picker to select a valid container
 - **Duplicate impressions**: The extension uses debouncing to prevent duplicate tracking notifications
+- **Import errors**: Ensure you're using the complete share code without any added spaces
 
 ## License
 

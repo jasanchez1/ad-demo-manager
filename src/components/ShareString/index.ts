@@ -1,0 +1,1 @@
+export { default as ShareString } from './ShareString.vue';

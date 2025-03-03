@@ -142,6 +142,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }, () => {
       console.log('[Background] Imported config saved');
       
+      // Wait a short moment before reopening the popup
+      setTimeout(() => {
+        try {
+          chrome.action.openPopup(() => {
+            if (chrome.runtime.lastError) {
+              console.error('[Background] Error reopening popup:', chrome.runtime.lastError);
+            } else {
+              console.log('[Background] Popup reopened after import');
+            }
+          });
+        } catch (error) {
+          console.error('[Background] Exception reopening popup:', error);
+        }
+      }, 500);
+      
       if (sendResponse) {
         sendResponse({ success: true });
       }

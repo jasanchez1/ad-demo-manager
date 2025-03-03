@@ -1,6 +1,6 @@
 import { ref } from 'vue';
-import { apiService } from '../services/api.service';
-import { storageService } from '../services/storage.service';
+import { apiService } from '../services/apiService';
+import { storageService } from '../services/storageService';
 import type { Site, AdType } from '../types';
 
 /**

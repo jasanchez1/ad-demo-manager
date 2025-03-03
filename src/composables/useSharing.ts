@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import type { AdConfig } from '../types';
-import { sharingService } from '../services/sharing.service';
+import { sharingService } from '../services/sharingService';
 
 /**
  * Composable for managing ad configuration sharing

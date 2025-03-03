@@ -1,6 +1,6 @@
 import { ref, Ref } from 'vue';
-import { storageService } from '../services/storage.service';
-import { tabService } from '../services/tab.service';
+import { storageService } from '../services/storageService';
+import { tabService } from '../services/tabService';
 import type { AdConfig } from '../types';
 
 /**

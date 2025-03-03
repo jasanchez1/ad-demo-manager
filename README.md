@@ -180,39 +180,39 @@ Composable functions manage application state:
 ## Project Structure
 
 ```
-/                              # Root directory
-├── public/                    # Static assets
-│   ├── background.js          # Background service worker
-│   ├── content.js             # Content script for ad injection
-│   ├── manifest.json          # Extension manifest
-│   ├── picker.js              # Element picker script
-│   └── styles.css             # Global styles
-├── src/                       # Vue application
-│   ├── components/            # Vue components
-│   │   ├── AdForm/            # Ad configuration form component
-│   │   ├── AdItemMenu/        # Menu for ad configuration actions
-│   │   └── ShareString/       # String-based sharing component
-│   ├── composables/           # Reusable state and logic
-│   │   ├── useAdConfigs.ts    # Ad configuration management
-│   │   ├── useDemoMode.ts     # Demo mode settings
-│   │   ├── useElementPicker.ts # Element picker functionality
-│   │   ├── useNavigation.ts   # Page navigation
+/                                 # Root directory
+├── public/                       # Static assets
+│   ├── background.js             # Background service worker
+│   ├── content.js                # Content script for ad injection
+│   ├── manifest.json             # Extension manifest
+│   ├── picker.js                 # Element picker script
+│   └── styles.css                # Global styles
+├── src/                          # Vue application
+│   ├── components/               # Vue components
+│   │   ├── AdForm/               # Ad configuration form component
+│   │   ├── AdItemMenu/           # Menu for ad configuration actions
+│   │   └── ShareString/          # String-based sharing component
+│   ├── composables/              # Reusable state and logic
+│   │   ├── useAdConfigs.ts       # Ad configuration management
+│   │   ├── useDemoMode.ts        # Demo mode settings
+│   │   ├── useElementPicker.ts   # Element picker functionality
+│   │   ├── useNavigation.ts      # Page navigation
 │   │   ├── useNetworkSettings.ts # API credentials management
-│   │   └── useSharing.ts      # Sharing functionality
-│   ├── services/              # External interaction services
-│   │   ├── api.service.ts     # Kevel API interactions
-│   │   ├── storage.service.ts # Chrome storage operations
-│   │   ├── tab.service.ts     # Chrome tabs operations
-│   │   └── sharing.service.ts # Configuration encoding/decoding
-│   ├── utils/                 # Utility functions
-│   │   └── message.ts         # Message display utilities
-│   ├── App.vue                # Main application component
-│   ├── main.ts                # Application entry point
-│   └── types/                 # TypeScript type definitions
-├── scripts/                   # Build scripts
-├── popup.html                 # Popup HTML template
-├── package.json               # Dependencies and scripts
-└── tsconfig.json              # TypeScript configuration
+│   │   └── useSharing.ts         # Sharing functionality
+│   ├── services/                 # External interaction services
+│   │   ├── apiService.ts         # Kevel API interactions
+│   │   ├── storageService.ts     # Chrome storage operations
+│   │   ├── tabService.ts         # Chrome tabs operations
+│   │   └── sharingService.ts     # Configuration encoding/decoding
+│   ├── utils/                    # Utility functions
+│   │   └── messageUtils.ts       # Message display utilities
+│   ├── App.vue                   # Main application component
+│   ├── main.ts                   # Application entry point
+│   └── types/                    # TypeScript type definitions
+├── scripts/                      # Build scripts
+├── popup.html                    # Popup HTML template
+├── package.json                  # Dependencies and scripts
+└── tsconfig.json                 # TypeScript configuration
 ```
 
 ## Troubleshooting

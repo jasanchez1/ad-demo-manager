@@ -48,7 +48,7 @@
                 <span class="ad-name">{{ config.name }}</span>
                 <span class="ad-type-badge">{{ `${config.adType.name} -
                   ${config.adType.width}x${config.adType.height}`
-                }}</span>
+                  }}</span>
               </div>
               <div class="ad-details">
                 <div class="ad-site">{{ config.site.name }}</div>
@@ -60,13 +60,15 @@
                 <input type="checkbox" :checked="config.isActive" @change="toggleAdConfig(config.id)">
                 <span class="slider"></span>
               </label>
-              <label class="delete" @click.stop="deleteAdConfig(config.id)">
-                <span class="delete-icon">×</span>
-              </label>
+              <AdItemMenu @edit="openAdDetails(config)" @share="shareAdAsString(config)"
+                @delete="deleteAdConfig(config.id)" @click.stop />
             </div>
           </div>
         </div>
-        <button class="create-button" @click="createNewAd">Create New Ad Config</button>
+        <div class="action-buttons">
+          <button class="create-button" @click="createNewAd">Create New Ad</button>
+          <button class="import-button" @click="openImportFromString">Import Ad</button>
+        </div>
       </div>
 
       <AdForm v-if="currentPage === Page.EditConfig && selectedAd" :ad-data="selectedAd" :ad-types="adTypes"
@@ -79,12 +81,27 @@
         {{ message }}
       </div>
     </div>
+
+    <!-- Share/Import Modals -->
+    <div v-if="showShareModal" class="modal-overlay" @click.self="showShareModal = false">
+      <div class="modal-container">
+        <ShareString :config="shareConfig" :isImport="false" @close="showShareModal = false" />
+      </div>
+    </div>
+
+    <div v-if="showImportModal" class="modal-overlay" @click.self="showImportModal = false">
+      <div class="modal-container">
+        <ShareString :isImport="true" @close="showImportModal = false" @import="handleImportFromString" />
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { Ref, ref, onMounted, watch } from '@vue/runtime-core'
 import { AdForm } from './components/AdForm'
+import { AdItemMenu } from './components/AdItemMenu'
+import { ShareString } from './components/ShareString'
 import type { Site, AdType, AdConfig, KevelAPIResponse, SiteResponse, AdTypeResponse } from '../src/types'
 
 interface SavedFormState {
@@ -194,6 +211,9 @@ interface Setup {
   startPicking: () => void;
   saveFormState: () => void;
   restoreFormState: () => void;
+  shareAdAsString: (config: AdConfig) => void;
+  openImportFromString: () => void;
+  handleImportFromString: (importedConfig: any) => void;
   isPicking: Ref<boolean>;
   networkId: Ref<string>;
   apiKey: Ref<string>;
@@ -212,6 +232,9 @@ interface Setup {
   isLoading: Ref<boolean>;
   newAd: Ref<AdConfig>;
   demoMode: Ref<boolean>;
+  showShareModal: Ref<boolean>;
+  showImportModal: Ref<boolean>;
+  shareConfig: Ref<AdConfig | null>;
 }
 
 const getEmptyNewAd = (): AdConfig => ({
@@ -227,7 +250,9 @@ const getEmptyNewAd = (): AdConfig => ({
 
 export default {
   components: {
-    AdForm
+    AdForm,
+    AdItemMenu,
+    ShareString
   },
   setup(): Setup {
     const networkId = ref('')
@@ -244,6 +269,9 @@ export default {
     const adConfigs = ref<AdConfig[]>([])
     const newAd = ref<AdConfig>(getEmptyNewAd())
     const selectedAd = ref<AdConfig | null>(null)
+    const showShareModal = ref(false)
+    const showImportModal = ref(false)
+    const shareConfig = ref<AdConfig | null>(null)
 
     const navigateTo = (page: Page) => {
       lastPage.value = currentPage.value;
@@ -409,6 +437,76 @@ export default {
     const createNewAd = () => {
       newAd.value = getEmptyNewAd();
       navigateTo(Page.CreateConfig)
+    }
+
+    // For sharing ad configurations as a string
+    const shareAdAsString = (config: AdConfig) => {
+      shareConfig.value = { ...config }
+      showShareModal.value = true
+    }
+
+    // Open the import modal
+    const openImportFromString = () => {
+      showImportModal.value = true
+    }
+
+    // Handle importing an ad config from a string
+    const handleImportFromString = (importedConfig: any) => {
+      try {
+        // Find or fallback to default ad type
+        let adType = adTypes.value.find(t =>
+          t.name === importedConfig.adType.name &&
+          t.width === importedConfig.adType.width &&
+          t.height === importedConfig.adType.height
+        );
+
+        if (!adType && adTypes.value.length > 0) {
+          adType = adTypes.value[0];
+        }
+
+        // Find or fallback to default site
+        let site = sites.value.find(s => s.name === importedConfig.site.name);
+        if (!site && sites.value.length > 0) {
+          site = sites.value[0];
+        }
+
+        // Require valid type and site
+        if (!adType || !site) {
+          message.value = 'Could not match ad type or site. Please configure network settings first.';
+          messageType.value = 'error';
+          return;
+        }
+
+        // Generate new ID
+        const newId = Math.max(0, ...adConfigs.value.map((ad) => ad.id)) + 1;
+
+        // Create final config
+        const finalConfig = {
+          id: newId,
+          name: importedConfig.name,
+          adType: adType,
+          site: site,
+          url: importedConfig.url,
+          divId: importedConfig.divId,
+          isActive: importedConfig.isActive ?? false, // Default to inactive for safety
+          keywordQueryParam: importedConfig.keywordQueryParam || ''
+        };
+
+        // Add to configs and save
+        adConfigs.value.push(finalConfig);
+        saveAdConfigsToStorage();
+
+        message.value = 'Ad configuration imported successfully!';
+        messageType.value = 'success';
+
+        setTimeout(() => {
+          message.value = '';
+        }, 3000);
+      } catch (error) {
+        console.error('Error importing config:', error);
+        message.value = 'Error importing configuration';
+        messageType.value = 'error';
+      }
     }
 
     const cancelCreateAd = () => {
@@ -669,7 +767,13 @@ export default {
       cancelPicking,
       startPicking,
       saveFormState,
-      restoreFormState
+      restoreFormState,
+      showShareModal,
+      showImportModal,
+      shareConfig,
+      shareAdAsString,
+      openImportFromString,
+      handleImportFromString,
     }
   }
 }
@@ -1032,5 +1136,61 @@ button:disabled {
 .toggle-wrapper {
   display: flex;
   align-items: center;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.create-button,
+.import-button {
+  flex: 1;
+}
+
+.import-button {
+  background: #3182ce;
+}
+
+.import-button:hover {
+  background: #2c5282;
+}
+
+.ad-config-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-container {
+  width: 90%;
+  max-width: 360px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

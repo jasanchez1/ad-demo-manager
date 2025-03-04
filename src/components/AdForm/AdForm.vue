@@ -8,6 +8,19 @@
       </div>
 
       <div class="input-group" :class="{ required: adData.keywordQueryParam }">
+        <label>URL Pattern <span v-if="adData.keywordQueryParam" class="required-marker">*</span></label>
+        <div class="url-input-group">
+          <input type="text" v-model="adData.url" placeholder="e.g., https://example.com/*">
+          <button class="url-button" @click="useCurrentHost" type="button" title="Use current domain with wildcard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="input-group" :class="{ required: adData.keywordQueryParam }">
         <label>Ad Type <span v-if="adData.keywordQueryParam" class="required-marker">*</span></label>
         <select v-model="adData.adType.id">
           <option v-for="type in adTypes" :key="type.id" :value="type.id">
@@ -23,11 +36,6 @@
             {{ site.name }}
           </option>
         </select>
-      </div>
-
-      <div class="input-group" :class="{ required: adData.keywordQueryParam }">
-        <label>URL Pattern <span v-if="adData.keywordQueryParam" class="required-marker">*</span></label>
-        <input type="text" v-model="adData.url" placeholder="e.g., https://example.com/*">
       </div>
 
       <div class="input-group" :class="{ required: adData.keywordQueryParam }">
@@ -58,8 +66,8 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import type { AdConfig, AdType, Site } from '../../types'
-import { ref } from 'vue'
 
 interface Props {
   adData: AdConfig
@@ -81,6 +89,29 @@ const startPicking = () => {
 }
 
 const errors = ref<string[]>([])
+const currentHost = ref<string>('')
+
+// Get the current URL (only in development mode)
+onMounted(() => {
+  // Try to get the active tab URL
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]?.url) {
+      try {
+        const url = new URL(tabs[0].url)
+        currentHost.value = url.origin + '/*'
+      } catch (e) {
+        console.error('Invalid URL:', e)
+      }
+    }
+  })
+})
+
+// Use just the current host with a wildcard
+const useCurrentHost = () => {
+  if (currentHost.value) {
+    props.adData.url = currentHost.value
+  }
+}
 
 const validateForm = () => {
   errors.value = []
@@ -122,18 +153,27 @@ const onCancel = () => emit('cancel')
   color: #aaa;
 }
 
-.container-id-group {
+.container-id-group,
+.url-input-group {
   display: flex;
   gap: 4px;
 }
 
-.pick-button {
+.url-input-group input {
+  flex-grow: 1;
+}
+
+.pick-button,
+.url-button {
   height: 24px;
   padding: 0 8px;
   font-size: 11px;
   background: #3182ce;
   white-space: nowrap;
   width: auto !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .input-group input,
@@ -182,5 +222,14 @@ button {
   color: red;
   font-size: 12px;
   margin-bottom: 8px;
+}
+
+.required-marker {
+  color: #fd563c;
+}
+
+.optional-label {
+  color: #718096;
+  font-size: 10px;
 }
 </style>

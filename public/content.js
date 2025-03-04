@@ -168,6 +168,22 @@ function ensureNotificationStyles() {
     }
 }
 
+/**
+ * Get user's IP address from a public API
+ * @returns {Promise<string>} - IP address
+ */
+async function getUserIP() {
+    try {
+      // Use a public API to get the user's IP address
+      const response = await fetch('https://api.ipify.org?format=json');
+      const data = await response.json();
+      return data.ip;
+    } catch (error) {
+      contentLogger.error("Error getting IP:", error);
+      return "AUTO"; // Fallback
+    }
+  }
+
 // ====== Ad Injection ======
 
 /**
@@ -192,12 +208,18 @@ function injectAd(config, networkId) {
     async function fetchBannerAds() {
         contentLogger.log("Fetching ads...");
         try {
+            const userIP = await getUserIP();
             const response = await fetch(DECISIONS_API_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
+                    "url": window.location.href,
+                    "user": {
+                        "key": "demo-user-1234"
+                    },
+                    "ip": userIP,
                     "placements": [{
                         "divName": DIV_NAME,
                         "networkId": networkId,
@@ -206,7 +228,10 @@ function injectAd(config, networkId) {
                     }],
                     "keywords": config.keywordQueryParam ?
                         [`category=${new URLSearchParams(location.search).get(config.keywordQueryParam)}`] :
-                        []
+                        [],
+                    "keywords": config.keywordQueryParam ?
+                        [`category=${new URLSearchParams(location.search).get(config.keywordQueryParam)}`] :
+                        [],
                 })
             });
 

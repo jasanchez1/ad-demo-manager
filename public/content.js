@@ -174,15 +174,41 @@ function ensureNotificationStyles() {
  */
 async function getUserIP() {
     try {
-      // Use a public API to get the user's IP address
-      const response = await fetch('https://api.ipify.org?format=json');
-      const data = await response.json();
-      return data.ip;
+        // Use a public API to get the user's IP address
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        return data.ip;
     } catch (error) {
-      contentLogger.error("Error getting IP:", error);
-      return "AUTO"; // Fallback
+        contentLogger.error("Error getting IP:", error);
+        return "AUTO"; // Fallback
     }
-  }
+}
+
+/**
+ * Extract category keyword from URL based on configuration
+ * @param {Object} config - Ad configuration with category settings
+ * @returns {string|null} - Extracted category or null if not found
+ */
+function extractCategoryFromUrl(config) {
+    // Check if we should use query parameter
+    if (config.keywordQueryParam) {
+        return new URLSearchParams(location.search).get(config.keywordQueryParam);
+    }
+
+    // Check if we should use path position
+    if (config.keywordPathPosition !== null && config.keywordPathPosition !== undefined) {
+        // Get path segments
+        const pathSegments = location.pathname.split('/').filter(segment => segment !== '');
+
+        // Return the segment at the specified position if it exists
+        if (pathSegments.length > config.keywordPathPosition) {
+            return pathSegments[config.keywordPathPosition];
+        }
+    }
+
+    // No category found
+    return null;
+}
 
 // ====== Ad Injection ======
 
@@ -198,41 +224,45 @@ function injectAd(config, networkId) {
     let imageURLs = [];
     let clickURLs = [];
     let impressionURLs = [];
-    let categoryId = null;
     let lastInjectedAd = null; // Keep track of the last injected ad
 
     /**
-     * Fetch banner ads from the Kevel API
-     * @returns {Promise<string|null>} - Ad ID or null if no ads available
-     */
+ * Fetch banner ads from the Kevel API
+ * @returns {Promise<string|null>} - Ad ID or null if no ads available
+ */
     async function fetchBannerAds() {
         contentLogger.log("Fetching ads...");
         try {
+            // Get IP address
             const userIP = await getUserIP();
+
+            // Extract category from URL
+            const category = extractCategoryFromUrl(config);
+
+            // Create request body with the additional parameters
+            const requestBody = {
+                "url": window.location.href,
+                "user": {
+                    "key": "demo-user-1234"
+                },
+                "ip": userIP,
+                "placements": [{
+                    "divName": DIV_NAME,
+                    "networkId": networkId,
+                    "siteId": config.site.id.toString(),
+                    "adTypes": [config.adType.id]
+                }],
+                "keywords": category ? [`category=${category}`] : [],
+            };
+
+            contentLogger.log("Request body:", requestBody);
+
             const response = await fetch(DECISIONS_API_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    "url": window.location.href,
-                    "user": {
-                        "key": "demo-user-1234"
-                    },
-                    "ip": userIP,
-                    "placements": [{
-                        "divName": DIV_NAME,
-                        "networkId": networkId,
-                        "siteId": config.site.id.toString(),
-                        "adTypes": [config.adType.id]
-                    }],
-                    "keywords": config.keywordQueryParam ?
-                        [`category=${new URLSearchParams(location.search).get(config.keywordQueryParam)}`] :
-                        [],
-                    "keywords": config.keywordQueryParam ?
-                        [`category=${new URLSearchParams(location.search).get(config.keywordQueryParam)}`] :
-                        [],
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();
@@ -258,6 +288,7 @@ function injectAd(config, networkId) {
             return null;
         }
     }
+
 
     /**
      * Remove any injected banner
@@ -446,37 +477,32 @@ function injectAd(config, networkId) {
         }
     }
 
-    // Handle URL parameter changes for dynamic category targeting
-    if (config.keywordQueryParam) {
-        setupCategoryObserver();
-    }
-
     /**
-     * Set up observer for category parameter changes
-     */
+ * Set up observer for URL or path changes
+ */
     function setupCategoryObserver() {
         // Initial category check
-        const urlParams = new URLSearchParams(location.search);
-        categoryId = urlParams.get(config.keywordQueryParam);
+        let currentCategory = extractCategoryFromUrl(config);
+        let categoryId = currentCategory; // Keep track of the current category
 
         // Watch for DOM changes that might indicate URL changes
         const observer = new MutationObserver(() => {
-            const urlParams = new URLSearchParams(location.search);
-            const currentCategoryId = urlParams.get(config.keywordQueryParam);
+            const newCategory = extractCategoryFromUrl(config);
 
-            if (!currentCategoryId) {
+            if (!newCategory) {
                 removeInjectedBanner();
-                categoryId = currentCategoryId;
+                categoryId = newCategory;
                 return;
             }
 
-            if (currentCategoryId !== categoryId) {
-                categoryId = currentCategoryId;
+            if (newCategory !== categoryId) {
+                categoryId = newCategory;
+                contentLogger.log(`Category changed to: ${categoryId}`);
                 fetchTrackAndInjectBanner();
                 return;
             }
 
-            if (currentCategoryId === categoryId) {
+            if (newCategory === categoryId) {
                 if (imageURLs.length) {
                     // Don't reinject if it's the same ad and already showing
                     const existing = document.getElementById(DIV_NAME);
@@ -488,6 +514,7 @@ function injectAd(config, networkId) {
                 }
             }
         });
+
         observer.observe(document.body, {
             attributes: true,
             childList: true,
@@ -499,22 +526,22 @@ function injectAd(config, networkId) {
         new MutationObserver(() => {
             if (location.href !== lastUrl) {
                 lastUrl = location.href;
-                contentLogger.log('URL changed, checking for category param');
+                contentLogger.log('URL changed, checking for category');
 
-                if (config.keywordQueryParam) {
-                    const urlParams = new URLSearchParams(location.search);
-                    const currentCategoryId = urlParams.get(config.keywordQueryParam);
+                const newCategory = extractCategoryFromUrl(config);
 
-                    if (currentCategoryId !== categoryId) {
-                        contentLogger.log(`Category changed from ${categoryId} to ${currentCategoryId}`);
-                        categoryId = currentCategoryId;
-                        fetchTrackAndInjectBanner();
-                    }
+                if (newCategory !== categoryId) {
+                    contentLogger.log(`Category changed from ${categoryId} to ${newCategory}`);
+                    categoryId = newCategory;
+                    fetchTrackAndInjectBanner();
                 }
             }
         }).observe(document, { subtree: true, childList: true });
     }
-
+    if (config.keywordQueryParam || (config.keywordPathPosition !== null && config.keywordPathPosition !== undefined)) {
+        setupCategoryObserver();
+    }
+    
     // Initial fetch and inject
     fetchTrackAndInjectBanner();
 }

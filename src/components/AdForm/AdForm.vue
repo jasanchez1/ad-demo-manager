@@ -280,7 +280,7 @@ const updateCurrentQueryValue = () => {
     if (tabs[0]?.url) {
       try {
         const url = new URL(tabs[0].url);
-        const queryValue = url.searchParams.get(props.adData.keywordQueryParam);
+        const queryValue = props.adData.keywordQueryParam ? url.searchParams.get(props.adData.keywordQueryParam) : null;
         currentQueryValue.value = queryValue;
       } catch (e) {
         console.error('Invalid URL:', e);
@@ -574,6 +574,7 @@ button {
 
 /* Consistent inputs */
 .collapsible-section.expanded input[type="number"] {
+  appearance: textfield;
   -moz-appearance: textfield;
 }
 

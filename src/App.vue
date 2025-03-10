@@ -25,7 +25,7 @@
           <div class="actions">
             <button v-if="savedValues.networkId && savedValues.apiKey" class="secondary"
               @click="navigateBack">Cancel</button>
-            <button @click="saveSettings" :disabled="isLoading"> {{ isLoading ? 'Saving...' : 'Save' }} </button>
+            <button @click="handleSuccessfulSettingsSave" :disabled="isLoading"> {{ isLoading ? 'Saving...' : 'Save' }} </button>
           </div>
           <div class="input-group">
             <label class="toggle-label">
@@ -226,6 +226,16 @@ export default {
       }
     };
 
+    // Handler for successful settings save
+    const handleSuccessfulSettingsSave = async () => {
+      if (await saveSettings()) {
+        // Navigate to Ad Configurations page after successful save
+        navigateTo(Page.AdConfigs);
+        return true;
+      }
+      return false;
+    };
+
     // Initialize on mount
     onMounted(async () => {
       // Check for container value from picker
@@ -235,6 +245,11 @@ export default {
       await loadSavedValues();
       await loadAdConfigs();
       await loadDemoMode();
+      
+      // Check if network settings are configured, redirect to Settings if not
+      if (!savedValues.value.networkId || !savedValues.value.apiKey) {
+        navigateTo(Page.Settings);
+      }
     });
 
     return {
@@ -283,6 +298,7 @@ export default {
       // UI handlers
       handleSaveAdDetails,
       handleSaveNewAd,
+      handleSuccessfulSettingsSave,
 
       // Messages
       message,

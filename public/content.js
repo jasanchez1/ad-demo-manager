@@ -405,8 +405,8 @@ function injectAd(config, networkId) {
         // Create banner container
         const bannerDiv = document.createElement("div");
         bannerDiv.id = DIV_NAME;
-        bannerDiv.style.width = `${config.adType.width * 1.3}px`;
-        bannerDiv.style.height = `${config.adType.height * 1.3}px`;
+        bannerDiv.style.width = `${config.adType.width}px`;
+        bannerDiv.style.height = `${config.adType.height}px`;
         bannerDiv.style.margin = "0 auto";
         bannerDiv.style.marginBottom = "5px";
         bannerDiv.style.marginTop = "5px";

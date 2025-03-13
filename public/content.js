@@ -399,7 +399,6 @@ function injectAd(config, networkId) {
         const parentElements = document.getElementsByClassName(config.divId);
         if (parentElements.length > 0) {
             const parentDiv = parentElements[0];
-            parentDiv.style.paddingBottom = `${config.adType.height * 1.3}px`;
             parentDiv.style.clear = "both"; // Ensure clear if using floats
         }
 
@@ -409,7 +408,8 @@ function injectAd(config, networkId) {
         bannerDiv.style.width = `${config.adType.width * 1.3}px`;
         bannerDiv.style.height = `${config.adType.height * 1.3}px`;
         bannerDiv.style.margin = "0 auto";
-        bannerDiv.style.marginBottom = "20px";
+        bannerDiv.style.marginBottom = "5px";
+        bannerDiv.style.marginTop = "5px";
         bannerDiv.style.display = "block";
         bannerDiv.style.border = "0.5px solid grey";
         bannerDiv.style.borderRadius = "4px";
